@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel Recommendations</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        .card {
+            border-radius: 0.5rem;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .card-header {
+            font-weight: 600;
+            background: linear-gradient(135deg, #0d6efd, #6610f2);
+            color: white;
+            border: none;
+        }
+
+        .nav-tabs .nav-link {
+            font-weight: 500;
+        }
+
+        .budget-card {
+            border-left: 4px solid #0d6efd;
+        }
+
+        .recommendations-header {
+            background: linear-gradient(135deg, #0d6efd, #6610f2);
+            color: white;
+            padding: 3rem 0;
+            margin-bottom: 2rem;
+        }
+
+        .interests-card {
+            background: linear-gradient(45deg, rgba(13, 110, 253, 0.1), rgba(102, 16, 242, 0.1));
+            border-left: 4px solid #0d6efd;
+            border-radius: 0.5rem;
+        }
+
+        .interest-badge {
+            background: linear-gradient(45deg, #0d6efd, #6610f2);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin: 0.25rem;
+            display: inline-block;
+        }
+
+        .recommendation-card {
+            height: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .recommendation-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .card-img-top {
+            height: 200px;
+            object-fit: cover;
+            background: linear-gradient(45deg, #0d6efd, #6610f2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 3rem;
+        }
+
+        .destination-icon {
+            font-size: 3rem;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .tag-badge {
+            background-color: #e9ecef;
+            color: #495057;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin: 0.125rem;
+            display: inline-block;
+        }
+
+        .cost-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .cost-low {
+            background-color: #d1edff;
+            color: #0969da;
+        }
+
+        .cost-medium {
+            background-color: #fff4e6;
+            color: #d97706;
+        }
+
+        .cost-high {
+            background-color: #ffe6e6;
+            color: #dc2626;
+        }
+
+        .info-item {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-left: 3px solid #0d6efd;
+        }
+
+        .info-item strong {
+            color: #0d6efd;
+        }
+
+        .match-reason {
+            background: linear-gradient(45deg, rgba(13, 110, 253, 0.1), rgba(102, 16, 242, 0.1));
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-style: italic;
+            border-left: 3px solid #6610f2;
+            margin-top: 1rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #0d6efd, #6610f2);
+            border: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
+        }
+
+        .btn-outline-primary {
+            border-color: #0d6efd;
+            color: #0d6efd;
+            font-weight: 500;
+        }
+
+        .btn-outline-primary:hover {
+            background: linear-gradient(45deg, #0d6efd, #6610f2);
+            border-color: #0d6efd;
+        }
+
+        .search-card {
+            border-left: 4px solid #0d6efd;
+            background-color: white;
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #0d6efd, #6610f2);
+            color: white;
+            border: none;
+        }
+
+        .modal-content {
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .form-check-input:checked {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+
+        .alert-info {
+            border-left: 4px solid #0dcaf0;
+            background-color: rgba(13, 202, 240, 0.1);
+        }
+
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            
+            body {
+                background-color: white;
+                font-size: 12pt;
+            }
+            
+            .card {
+                border: none;
+                box-shadow: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .recommendations-header {
+                padding: 2rem 0;
+            }
+            
+            .card-columns {
+                column-count: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="recommendations-header">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <nav aria-label="breadcrumb" class="mb-3">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item">
+                                <a href="{{ url_for('home') }}" class="text-white text-decoration-none">
+                                    <i class="fas fa-home"></i> Home
+                                </a>
+                            </li>
+                            <li class="breadcrumb-item active text-white-50" aria-current="page">
+                                Recommendations
+                            </li>
+                        </ol>
+                    </nav>
+                    <h1 class="display-4 fw-bold mb-3">
+                        <i class="fas fa-globe-americas"></i> Travel Recommendations
+                    </h1>
+                    <p class="lead mb-0">Discover amazing destinations tailored to your interests</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        {% if interests %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card interests-card">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">
+                            <i class="fas fa-heart text-primary"></i> Your Selected Interests
+                        </h5>
+                        <div class="d-flex flex-wrap">
+                            {% for interest in interests %}
+                            <span class="interest-badge">
+                                <i class="fas fa-tag"></i> {{ interest|title }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card search-card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-search text-primary"></i> Search Destinations
+                        </h5>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" class="form-control" id="searchInput" 
+                                   placeholder="Search by destination, country, or description...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row" id="recommendationsContainer">
+            {% if recommendations %}
+                {% for rec in recommendations %}
+                <div class="col-lg-4 col-md-6 mb-4 recommendation-item fade-in" style="animation-delay: {{ loop.index0 * 0.1 }}s">
+                    <div class="card recommendation-card h-100">
+                        <div class="card-img-top d-flex align-items-center justify-content-center">
+                            <i class="destination-icon fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title text-primary fw-bold">
+                                {{ rec.name or rec.destination or "Unknown Destination" }}
+                            </h5>
+                            {% if rec.country %}
+                            <p class="text-muted mb-2">
+                                <i class="fas fa-globe"></i> {{ rec.country }}
+                                {% if rec.continent %}
+                                <span class="text-muted"> • {{ rec.continent }}</span>
+                                {% endif %}
+                            </p>
+                            {% endif %}
+                            
+                            {% if rec.interest %}
+                            <div class="mb-2">
+                                <span class="tag-badge">
+                                    <i class="fas fa-heart"></i> {{ rec.interest|title }}
+                                </span>
+                            </div>
+                            {% endif %}
+                            
+                            <p class="card-text flex-grow-1">
+                                {{ rec.description or "Beautiful destination waiting to be explored!" }}
+                            </p>
+                            
+                            <div class="info-section mb-3">
+                                {% if rec.best_time %}
+                                <div class="info-item">
+                                    <strong><i class="fas fa-calendar-alt"></i> Best Time:</strong> {{ rec.best_time }}
+                                </div>
+                                {% endif %}
+                                
+                                {% if rec.cost %}
+                                <div class="info-item">
+                                    <strong><i class="fas fa-dollar-sign"></i> Cost Level:</strong>
+                                    <span class="cost-badge 
+                                        {% if rec.cost|lower in ['low', 'budget', 'cheap'] %}cost-low
+                                        {% elif rec.cost|lower in ['medium', 'moderate', 'mid-range'] %}cost-medium
+                                        {% else %}cost-high
+                                        {% endif %}">
+                                        {{ rec.cost|title }}
+                                    </span>
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            {% if rec.tags %}
+                            <div class="mb-3">
+                                {% for tag in rec.tags %}
+                                <span class="tag-badge">{{ tag|title }}</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            
+                            {% if rec.match_reason %}
+                            <div class="match-reason">
+                                <strong><i class="fas fa-lightbulb"></i> Why it matches:</strong> {{ rec.match_reason }}
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mt-auto pt-3">
+                                <div class="d-grid gap-2">
+                                    <form action="{{ url_for('destination') }}" method="post" class="d-inline">
+                                        <input type="hidden" name="destination" value="{{ rec.name or rec.destination }}">
+                                        <input type="hidden" name="country" value="{{ rec.country or '' }}">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-info-circle"></i> Learn More
+                                        </button>
+                                    </form>
+                                    <button class="btn btn-outline-primary w-100" 
+                                            onclick="showPlanTripModal('{{ rec.name or rec.destination }}', '{{ rec.country or '' }}')">
+                                        <i class="fas fa-route"></i> Plan Trip
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-12">
+                    <div class="alert alert-info text-center" role="alert">
+                        <i class="fas fa-info-circle fa-2x mb-3"></i>
+                        <h4>No Recommendations Found</h4>
+                        <p class="mb-0">Try selecting different interests or check back later for new destinations!</p>
+                        <a href="{{ url_for('home') }}" class="btn btn-primary mt-3">
+                            <i class="fas fa-arrow-left"></i> Back to Home
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <div id="noSearchResults" class="row d-none">
+            <div class="col-12">
+                <div class="alert alert-warning text-center" role="alert">
+                    <i class="fas fa-search fa-2x mb-3"></i>
+                    <h4>No Results Found</h4>
+                    <p class="mb-0">No destinations match your search criteria. Try different keywords!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plan Trip Modal -->
+    <div class="modal fade" id="planTripModal" tabindex="-1" aria-labelledby="planTripModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="planTripModalLabel">
+                        <i class="fas fa-route"></i> Plan Your Trip
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ url_for('itinerary') }}" method="post">
+                    <div class="modal-body">
+                        <input type="hidden" name="destination" id="modalDestination">
+                        <input type="hidden" name="country" id="modalCountry">
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="start_date" class="form-label fw-semibold">
+                                    <i class="fas fa-calendar-alt text-primary"></i> Start Date
+                                </label>
+                                <input type="date" class="form-control" name="start_date" id="start_date" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="end_date" class="form-label fw-semibold">
+                                    <i class="fas fa-calendar-alt text-primary"></i> End Date
+                                </label>
+                                <input type="date" class="form-control" name="end_date" id="end_date" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="budget" class="form-label fw-semibold">
+                                    <i class="fas fa-dollar-sign text-primary"></i> Budget (USD)
+                                </label>
+                                <input type="number" class="form-control" name="budget" id="budget" 
+                                       min="100" step="50" placeholder="e.g., 1500" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="num_people" class="form-label fw-semibold">
+                                    <i class="fas fa-users text-primary"></i> Number of Travelers
+                                </label>
+                                <input type="number" class="form-control" name="num_people" id="num_people" 
+                                       min="1" value="1" required>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                <i class="fas fa-heart text-primary"></i> Interests (select all that apply)
+                            </label>
+                            <div class="row">
+                                {% set common_interests = ['culture', 'food', 'nature', 'adventure', 'relaxation', 'nightlife', 'shopping', 'history', 'art', 'photography'] %}
+                                {% for interest in common_interests %}
+                                <div class="col-md-6 col-lg-4 mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="interests" 
+                                               value="{{ interest }}" id="interest_{{ interest }}"
+                                               {% if interests and interest in interests %}checked{% endif %}>
+                                        <label class="form-check-label" for="interest_{{ interest }}">
+                                            {{ interest|title }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-route"></i> Generate Itinerary
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const items = document.querySelectorAll('.recommendation-item');
+            const noResults = document.getElementById('noSearchResults');
+            const container = document.getElementById('recommendationsContainer');
+            let visibleCount = 0;
+
+            items.forEach(item => {
+                const title = item.querySelector('.card-title').textContent.toLowerCase();
+                const country = item.querySelector('.text-muted');
+                const description = item.querySelector('.card-text').textContent.toLowerCase();
+                const tags = Array.from(item.querySelectorAll('.tag-badge')).map(tag => tag.textContent.toLowerCase());
+                const matchReason = item.querySelector('.match-reason');
+                
+                const countryText = country ? country.textContent.toLowerCase() : '';
+                const matchReasonText = matchReason ? matchReason.textContent.toLowerCase() : '';
+                
+                const matches = title.includes(searchTerm) || 
+                              countryText.includes(searchTerm) ||
+                              description.includes(searchTerm) ||
+                              matchReasonText.includes(searchTerm) ||
+                              tags.some(tag => tag.includes(searchTerm));
+
+                if (matches) {
+                    item.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            // Show/hide no results message
+            if (visibleCount === 0 && searchTerm !== '') {
+                noResults.classList.remove('d-none');
+                container.style.display = 'none';
+            } else {
+                noResults.classList.add('d-none');
+                container.style.display = 'flex';
+            }
+        });
+
+        // Plan trip modal functions
+        function showPlanTripModal(destination, country) {
+            document.getElementById('modalDestination').value = destination;
+            document.getElementById('modalCountry').value = country || '';
+            
+            // Set minimum date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('start_date').min = today;
+            document.getElementById('end_date').min = today;
+            
+            const modal = new bootstrap.Modal(document.getElementById('planTripModal'));
+            modal.show();
+        }
+
+        // Update end date minimum when start date changes
+        document.getElementById('start_date').addEventListener('change', function() {
+            document.getElementById('end_date').min = this.value;
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+body {
+    background-image: url("{{ url_for('static', filename='images/b1b377d4-26da-4a08-a16f-bde59811179b.jpg') }}");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    min-height: 100vh;
+}
+.card {
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.card-header {
+    font-weight: 600;
+}
+
+.nav-tabs .nav-link {
+    font-weight: 500;
+}
+
+.budget-card {
+    border-left: 4px solid #0d6efd;
+}
+
+.itinerary-day {
+    border-left: 3px solid #0d6efd;
+    padding-left: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.itinerary-activity {
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    body {
+        background-color: white;
+        font-size: 12pt;
+    }
+    
+    .card {
+        border: none;
+        box-shadow: none;
+    }
+}

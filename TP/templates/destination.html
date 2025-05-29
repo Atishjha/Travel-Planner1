@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}{{ destination.name }} Travel Info{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <h2 class="h5 mb-0">
+                    <i class="bi bi-info-circle"></i> {{ destination.name }}, {{ destination.country }}
+                </h2>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Best Season:</strong> {{ destination.best_season }}</p>
+                        <p><strong>Budget Level:</strong> 
+                            <span class="badge bg-{% if destination.budget == 'high' %}danger{% elif destination.budget == 'medium' %}warning{% else %}success{% endif %}">
+                                {{ destination.budget }}
+                            </span>
+                        </p>
+                        <p><strong>Top Interests:</strong> 
+                            {% for interest in destination.interests %}
+                                <span class="badge bg-secondary">{{ interest }}</span>
+                            {% endfor %}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Visa Type:</strong> {{ destination.visa_type }}</p>
+                        <p><strong>Visa Cost:</strong> ₹{{ destination.visa_cost }}</p>
+                        <p><strong>Approval Chance:</strong> 
+                            <span class="badge bg-{% if destination.visa_chance == 'high' %}success{% elif destination.visa_chance == 'medium' %}warning{% else %}danger{% endif %}">
+                                {{ destination.visa_chance }}
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <h4 class="h5">Cost Estimates (INR)</h4>
+                <div class="row">
+                    <div class="col-md-4">
+                        <p><strong>Flight:</strong> ₹{{ destination.flight_cost }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>Daily Hotel:</strong> ₹{{ destination.daily_hotel }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>Daily Food:</strong> ₹{{ destination.daily_food }}</p>
+                    </div>
+                </div>
+                
+                {% if destination.images %}
+                <hr>
+                <h4 class="h5">Photo Spots</h4>
+                <div class="row g-3">
+                    {% for image in destination.images[:3] %}
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <img src="{{ image.url }}" class="card-img-top" alt="{{ image.description }}">
+                            <div class="card-body">
+                                <p class="card-text small">{{ image.description }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                {% if destination.traveler_insights %}
+                <hr>
+                <h4 class="h5">Traveler Insights</h4>
+                <div class="alert alert-info">
+                    {{ destination.traveler_insights|replace('\n', '<br>')|safe }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card shadow">
+            <div class="card-header bg-white">
+                <h3 class="h5 mb-0">Plan Your Trip</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('itinerary') }}">
+                    <input type="hidden" name="destination" value="{{ destination.name }}">
+                    <input type="hidden" name="country" value="{{ country }}">
+                    <input type="hidden" name="interests" value="{{ destination.interests|join(',') }}">
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="start_date" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="end_date" class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="budget" class="form-label">Total Budget (INR)</label>
+                            <input type="number" class="form-control" id="budget" name="budget" min="0" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="num_people" class="form-label">Number of Travelers</label>
+                            <input type="number" class="form-control" id="num_people" name="num_people" min="1" value="1" required>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-journal-text"></i> Generate Itinerary
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

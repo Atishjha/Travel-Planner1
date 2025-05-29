@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Plan Your Trip{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-white">
+                <ul class="nav nav-tabs card-header-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#specific">Specific Destination</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#recommend">Get Recommendations</a>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="card-body">
+                <div class="tab-content">
+                    <!-- Specific Destination Tab -->
+                    <div class="tab-pane fade show active" id="specific">
+                        <form method="POST" action="{{ url_for('destination') }}">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="destination" class="form-label">Destination</label>
+                                    <input type="text" class="form-control" id="destination" name="destination" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="country" class="form-label">Country (optional)</label>
+                                    <input type="text" class="form-control" id="country" name="country">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Your Interests</label>
+                                <div class="d-flex flex-wrap gap-2">
+                                    {% for interest in common_interests %}
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" 
+                                                   id="interest-{{ loop.index }}" 
+                                                   name="interests" value="{{ interest }}">
+                                            <label class="form-check-label" for="interest-{{ loop.index }}">
+                                                {{ interest }}
+                                            </label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">Get Destination Info</button>
+                        </form>
+                    </div>
+                    
+                    <!-- Recommendations Tab -->
+                    <div class="tab-pane fade" id="recommend">
+                        <form method="POST" action="{{ url_for('recommendations') }}">
+                            <div class="mb-3">
+                                <label class="form-label">Select Your Interests</label>
+                                <div class="d-flex flex-wrap gap-2">
+                                    {% for interest in common_interests %}
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" 
+                                                   id="rec-interest-{{ loop.index }}" 
+                                                   name="interests" value="{{ interest }}">
+                                            <label class="form-check-label" for="rec-interest-{{ loop.index }}">
+                                                {{ interest }}
+                                            </label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="continent" class="form-label">Filter by Continent (optional)</label>
+                                <select class="form-select" id="continent" name="continent">
+                                    <option value="">All Continents</option>
+                                    <option value="Africa">Africa</option>
+                                    <option value="Asia">Asia</option>
+                                    <option value="Europe">Europe</option>
+                                    <option value="North America">North America</option>
+                                    <option value="South America">South America</option>
+                                    <option value="Oceania">Oceania</option>
+                                </select>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">Get Recommendations</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Enable Bootstrap tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+</script>
+{% endblock %}

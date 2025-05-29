@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Profile{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card shadow">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">User Profile</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-sm-3">
+                        <h6 class="mb-0">Username</h6>
+                    </div>
+                    <div class="col-sm-9 text-secondary">
+                        {{ user.username }}
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <h6 class="mb-0">Email</h6>
+                    </div>
+                    <div class="col-sm-9 text-secondary">
+                        {{ user.email }}
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <h6 class="mb-0">Member Since</h6>
+                    </div>
+                    <div class="col-sm-9 text-secondary">
+                        {{ user.created_at.strftime('%B %d, %Y') }}
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <a class="btn btn-primary" href="{{ url_for('home') }}">Plan New Trip</a>
+                        <a class="btn btn-outline-secondary" href="{{ url_for('logout') }}">Logout</a>
+                    </div>
+                </div>
+                
+                <!-- Travel History Section -->
+                <hr>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <h4 class="mb-3">Your Travel Plans</h4>
+                        
+                        {% if history %}
+                            <div class="list-group">
+                                {% for trip in history %}
+                                <div class="list-group-item mb-3">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h5 class="mb-1">
+                                            {{ trip.destination }}
+                                            {% if trip.country %}
+                                            , {{ trip.country }}
+                                            {% endif %}
+                                        </h5>
+                                        <small>{{ trip.created_at.strftime('%b %d, %Y') }}</small>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-md-4">
+                                            <p class="mb-1"><strong>Dates:</strong><br>
+                                            {{ trip.start_date }} to {{ trip.end_date }}</p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <p class="mb-1"><strong>Budget:</strong><br>
+                                            ₹{{ "%.2f"|format(trip.budget) }}</p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <p class="mb-1"><strong>Travelers:</strong><br>
+                                            {{ trip.num_people }}</p>
+                                        </div>
+                                    </div>
+                                    {% if trip.interests %}
+                                    <div class="mt-2">
+                                        <strong>Interests:</strong>
+                                        {% for interest in trip.interests %}
+                                            <span class="badge bg-primary me-1">{{ interest }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                    <a href="#" class="btn btn-sm btn-outline-info mt-2 view-itinerary" 
+                                       data-bs-toggle="modal" data-bs-target="#itineraryModal"
+                                       data-itinerary="{{ trip.itinerary|tojson|forceescape }}">
+                                        View Full Itinerary
+                                    </a>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> You haven't planned any trips yet.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Itinerary Modal -->
+<div class="modal fade" id="itineraryModal" tabindex="-1" aria-labelledby="itineraryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="itineraryModalLabel">Trip Itinerary</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="itineraryContent">
+                <!-- Content will be loaded via JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle itinerary modal display
+    const viewButtons = document.querySelectorAll('.view-itinerary');
+    const itineraryContent = document.getElementById('itineraryContent');
+    
+    viewButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const itineraryData = JSON.parse(this.getAttribute('data-itinerary'));
+            
+            // Format the itinerary content for display
+            let content = '';
+            if (itineraryData.content) {
+                // If itinerary is stored as an object with content property
+                content = itineraryData.content;
+            } else {
+                // If itinerary is stored as a string directly
+                content = itineraryData;
+            }
+            
+            // Preserve line breaks and formatting
+            content = content.replace(/\n/g, '<br>');
+            
+            itineraryContent.innerHTML = content;
+        });
+    });
+});
+</script>
+{% endblock %}
