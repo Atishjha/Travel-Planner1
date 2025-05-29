@@ -119,7 +119,7 @@ def get_user_by_username(username):
     """Get user by username"""
     connection = get_db_connection()
     if connection:
-        cursor = connection.cursor(dictionary=True)
+        cursor = connection.cursor(cursor_factory=DictCursor)
         cursor.execute('SELECT * FROM users WHERE username = %s', (username,))
         user = cursor.fetchone()
         cursor.close()
