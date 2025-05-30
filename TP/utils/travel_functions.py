@@ -349,59 +349,44 @@ def generate_traveler_insights(destination: str, country: str = None) -> str:
 
 def get_destination_info(destination: str, country: str = None) -> dict:
     """
-    Get detailed information about any global destination with robust error handling
+    Get detailed information about any global destination
     
     Args:
         destination: Name of the destination
         country: Optional country name for disambiguation
     
     Returns:
-        Dictionary with destination details (always contains all required fields)
+        Dictionary with destination details
     """
-    # Default values structure
-    DEFAULT_VALUES = {
-        "name": "",
-        "country": "Unknown",
-        "budget": "medium",
-        "interests": ["sightseeing", "culture", "food"],
-        "best_season": "year-round",
-        "flight_cost": 40000,
-        "daily_hotel": 2500,
-        "daily_food": 1500,
-        "daily_activities": 1500,
-        "visa_cost": 3000,
-        "visa_type": "Tourist Visa",
-        "visa_process": "Check embassy requirements",
-        "visa_chance": "medium",
-        "images": [],
-        "traveler_insights": "No insights available"
-    }
-
     try:
         # Handle continents specially
-        continents = ["europe", "asia", "africa", "north america", 
-                     "south america", "australia", "antarctica", "oceania"]
+        continents = ["europe", "asia", "africa", "north america", "south america", 
+                      "australia", "antarctica", "oceania"]
         
         if destination.lower() in continents:
+            # Get continent info first
             continent_info = get_continent_info(destination)
+            
+            # Add images and traveler insights
             continent_info["images"] = get_destination_images_with_gemini(destination, country, num_images=3)
             continent_info["traveler_insights"] = generate_traveler_insights(destination, country)
+            
             return continent_info
             
-        # Construct location string
+        # Construct prompt with country if provided
         location = f"{destination}, {country}" if country else destination
         
-        # Gemini prompt
+        # Use Gemini to get destination information
         prompt = f"""
         Provide detailed travel information for {location} in JSON format for Indian citizens.
         Include the following details:
-        - Average flight cost from India in INR (as integer)
-        - Daily hotel cost (provide mid_range value)
+        - Average flight cost from India in INR
+        - Daily hotel cost (budget, mid-range, luxury) in INR
         - Daily food cost in INR
         - Daily activities cost in INR
         - Visa cost for Indian citizens in INR
-        - Visa type
-        - Visa process description
+        - Visa type (e.g., Visa on Arrival, eVisa, Visa-Free, etc.)
+        - Visa process description (application method, required documents, processing time)
         - Visa approval chance (low/medium/high)
         - Best season to visit
         - Top interests/attractions
@@ -415,94 +400,123 @@ def get_destination_info(destination: str, country: str = None) -> dict:
           "flight_cost": 35000,
           "daily_hotel": {{
             "budget": 1000,
-            "mid_range": 2500,
+            "mid_range": 2500, 
             "luxury": 6000
           }},
           "daily_food": 1200,
           "daily_activities": 1500,
           "visa_cost": 3000,
           "visa_type": "Schengen Visa",
-          "visa_process": "Apply at VFS center...",
+          "visa_process": "Apply at VFS center with documents including bank statements, itinerary, and hotel bookings 3-4 weeks in advance",
           "visa_chance": "medium",
           "best_season": "April-October",
-          "interests": ["beach", "culture", "food"],
+          "interests": ["beach", "culture", "hiking", "food"],
           "budget_category": "medium"
         }}
         """
         
-        # Get response from Gemini
+        # Use the newer recommended model
         model = genai.GenerativeModel(model_name="gemini-1.5-flash")
         response = model.generate_content(prompt)
         
+        # Process the response
+        import json
         try:
+            # Try to parse the JSON response
             dest_info = json.loads(response.text)
             
-            # Process flight_cost with multiple fallbacks
-            flight_cost = dest_info.get("flight_cost")
-            if flight_cost is None:
-                # Calculate default based on region
-                country_name = dest_info.get("country", "").lower()
-                if any(c in country_name for c in ['usa', 'canada', 'uk', 'europe']):
-                    flight_cost = 60000
-                elif any(c in country_name for c in ['thailand', 'vietnam', 'malaysia']):
-                    flight_cost = 25000
-                else:
-                    flight_cost = 40000
-            elif isinstance(flight_cost, str):
-                try:
-                    flight_cost = int(''.join(c for c in flight_cost if c.isdigit()))
-                except:
-                    flight_cost = 40000
+            # Handle the case where daily_hotel might be a dictionary or a single value
+            if isinstance(dest_info.get("daily_hotel", {}), dict):
+                daily_hotel = dest_info["daily_hotel"].get("mid_range", 2500)
+            else:
+                daily_hotel = dest_info.get("daily_hotel", 2500)
             
-            # Process daily_hotel (handle both dict and direct values)
-            daily_hotel = 2500
-            hotel_data = dest_info.get("daily_hotel", {})
-            if isinstance(hotel_data, dict):
-                daily_hotel = hotel_data.get("mid_range", 2500)
-            elif isinstance(hotel_data, (int, float)):
-                daily_hotel = hotel_data
-            
-            # Build result with all required fields
+            # Get country information if available
+            country_info = dest_info.get("country", country if country else "Unknown")
+                
+            # Create a standardized destination info dictionary
             result = {
                 "name": destination,
-                "country": dest_info.get("country", country if country else "Unknown"),
+                "country": country_info,
                 "budget": dest_info.get("budget_category", "medium"),
                 "interests": dest_info.get("interests", ["sightseeing"]),
                 "best_season": dest_info.get("best_season", "year-round"),
-                "flight_cost": max(flight_cost, 10000),  # Ensure minimum 10,000 INR
-                "daily_hotel": max(daily_hotel, 500),    # Ensure minimum 500 INR
-                "daily_food": max(dest_info.get("daily_food", 1500), 500),
-                "daily_activities": max(dest_info.get("daily_activities", 1500), 500),
-                "visa_cost": max(dest_info.get("visa_cost", 0), 0),
+                "flight_cost": dest_info.get("flight_cost", 40000),
+                "daily_hotel": daily_hotel,
+                "daily_food": dest_info.get("daily_food", 1500),
+                "daily_activities": dest_info.get("daily_activities", 1500),
+                "visa_cost": dest_info.get("visa_cost", 0),
                 "visa_type": dest_info.get("visa_type", "Tourist Visa"),
-                "visa_process": dest_info.get("visa_process", "Check embassy requirements"),
-                "visa_chance": dest_info.get("visa_chance", "medium"),
-                "images": get_destination_images_with_gemini(destination, country),
-                "traveler_insights": generate_traveler_insights(destination, country)
+                "visa_process": dest_info.get("visa_process", "Check with embassy for latest requirements"),
+                "visa_chance": dest_info.get("visa_chance", "medium")
             }
+            
+            # Add images using our new function
+            result["images"] = get_destination_images_with_gemini(destination, country)
+            
+            # Add traveler insights
+            result["traveler_insights"] = generate_traveler_insights(destination, country)
             
             return result
             
-        except json.JSONDecodeError as e:
-            print(f"JSON parse error for {location}: {e}")
-            # Return default values with destination-specific images/insights
-            result = DEFAULT_VALUES.copy()
-            result.update({
+        except json.JSONDecodeError:
+            # If JSON parsing fails, use fallback values
+            print(f"Error parsing destination data for {location}. Using default values.")
+            result = {
                 "name": destination,
                 "country": country if country else "Unknown",
-                "images": get_destination_images_with_gemini(destination, country),
-                "traveler_insights": generate_traveler_insights(destination, country)
-            })
+                "budget": "medium",
+                "interests": ["sightseeing", "culture", "food"],
+                "best_season": "year-round",
+                "flight_cost": 40000,
+                "daily_hotel": 2500,
+                "daily_food": 1500,
+                "daily_activities": 1500,
+                "visa_cost": 3000,
+                "visa_type": "Tourist Visa",
+                "visa_process": "Check with embassy for latest requirements",
+                "visa_chance": "medium"
+            }
+            
+            # Add images using our new function
+            result["images"] = get_destination_images_with_gemini(destination, country)
+            
+            # Add traveler insights
+            result["traveler_insights"] = generate_traveler_insights(destination, country)
+            
             return result
             
     except Exception as e:
-        print(f"Error getting destination info for {destination}: {str(e)}")
-        # Return default values with basic info
-        result = DEFAULT_VALUES.copy()
-        result.update({
+        print(f"Error getting destination info: {str(e)}")
+        # Create a basic response with default values
+        result = {
             "name": destination,
-            "country": country if country else "Unknown"
-        })
+            "country": country if country else "Unknown",
+            "budget": "medium",
+            "interests": ["sightseeing", "culture", "food"],
+            "best_season": "year-round",
+            "flight_cost": 40000,
+            "daily_hotel": 2500,
+            "daily_food": 1500,
+            "daily_activities": 1500,
+            "visa_cost": 3000,
+            "visa_type": "Tourist Visa",
+            "visa_process": "Check with embassy for latest requirements",
+            "visa_chance": "medium"
+        }
+        
+        # Try to add images even if other parts failed
+        try:
+            result["images"] = get_destination_images_with_gemini(destination, country)
+        except:
+            result["images"] = []
+            
+        # Try to add traveler insights even if other parts failed
+        try:
+            result["traveler_insights"] = generate_traveler_insights(destination, country)
+        except:
+            result["traveler_insights"] = "No traveler insights available."
+            
         return result
 def get_continent_info(continent: str) -> dict:
     """
@@ -906,57 +920,20 @@ def generate_itinerary(destination: str, start_date: str, end_date: str,
                       budget_info: Dict[str, Any], country: str = None) -> str:
     """Enhanced with visual elements and improved formatting"""
     try:
-        # Validate required budget fields first
-        if not all(key in budget_info for key in ['flight_cost', 'total_estimated', 'remaining']):
-            raise ValueError("Missing required budget information")
+        num_days = (datetime.strptime(end_date, "%d %B %Y") - datetime.strptime(start_date, "%d %B %Y")).days + 1
         
-        # Validate numeric budget values
-        try:
-            remaining = float(budget_info['remaining'])
-            total_estimated = float(budget_info['total_estimated'])
-            flight_cost = float(budget_info['flight_cost'])
-        except (ValueError, TypeError):
-            raise ValueError("Invalid budget values")
-
-        # Validate and calculate trip duration
-        try:
-            start_dt = datetime.strptime(start_date, "%d %B %Y")
-            end_dt = datetime.strptime(end_date, "%d %B %Y")
-            if end_dt < start_dt:
-                raise ValueError("End date cannot be before start date")
-            num_days = (end_dt - start_dt).days + 1
-        except ValueError as e:
-            raise ValueError(f"Invalid date format: {str(e)}")
-
-        # Get destination info with fallback
-        try:
-            dest_info = get_destination_info(destination, country)
-            # Ensure required visa fields exist
-            visa_fields = ['visa_type', 'visa_cost', 'visa_process', 'visa_chance']
-            for field in visa_fields:
-                if field not in dest_info:
-                    dest_info[field] = "Information not available"
-        except Exception as e:
-            print(f"Error getting destination info: {str(e)}")
-            dest_info = {
-                'name': destination,
-                'country': country or 'Unknown',
-                'visa_type': 'Check embassy',
-                'visa_cost': 0,
-                'visa_process': 'Information not available',
-                'visa_chance': 'medium',
-                'images': [],
-                'traveler_insights': 'No insights available'
-            }
-
-        # Rest of your function remains the same...
+        # Get destination info again for visa details
+        dest_info = get_destination_info(destination, country)
+        
+        # Construct location string with country if provided
         location = f"{destination}, {country}" if country else destination
         
-        if remaining >= 0:
-            budget_status = f"✅ Within budget (remaining: ₹{remaining:,.2f})"
+        # Format budget status message with visual indicators
+        if budget_info['remaining'] >= 0:
+            budget_status = f"✅ Within budget (remaining: ₹{budget_info['remaining']:,.2f})"
             budget_emoji = "💰"
         else:
-            budget_status = f"⚠️ Over budget by ₹{abs(remaining):,.2f}"
+            budget_status = f"⚠️ Over budget by ₹{abs(budget_info['remaining']):,.2f}"
             budget_emoji = "💸"
         
         # Create a visually appealing header
