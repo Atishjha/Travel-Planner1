@@ -1,4 +1,6 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
+from contextlib import closing
+
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import google.generativeai as genai
@@ -17,7 +19,13 @@ from functools import wraps
 import json
 
 app = Flask(__name__)
-
+with closing(get_db_connection()) as conn:
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT to_regclass('public.users')")
+        table_exists = cursor.fetchone()[0]
+        
+if not table_exists:
+    init_database()
 # Configuration
 app.secret_key = 'your-secret-key-change-this-in-production'  # Change this!
 genai.configure(api_key="AIzaSyDW4BCGnID5zsxrjDX1DNu23-Fn4tkH_Hw")
@@ -42,7 +50,7 @@ def get_db_connection():
         return None
 
 # Initialize database tables
-def init_database():
+'''def init_database():
     """Create necessary tables if they don't exist"""
     connection = get_db_connection()
     if connection:
@@ -81,7 +89,51 @@ def init_database():
         cursor.close()
         connection.close()
         print("Database initialized successfully")
-
+'''
+def init_database():
+    """Create necessary tables if they don't exist"""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor()
+        
+        try:
+            # Users table (PostgreSQL syntax)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(80) UNIQUE NOT NULL,
+                    email VARCHAR(120) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Travel history table (PostgreSQL syntax)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS travel_history (
+                    id SERIAL PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    destination VARCHAR(255) NOT NULL,
+                    country VARCHAR(100),
+                    start_date DATE,
+                    end_date DATE,
+                    budget DECIMAL(10, 2),
+                    num_people INT,
+                    interests JSONB,
+                    itinerary JSONB,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            ''')
+            
+            connection.commit()
+            print("Database initialized successfully")
+        except Exception as e:
+            print(f"Error initializing database: {e}")
+            connection.rollback()
+        finally:
+            cursor.close()
+            connection.close()
 # Authentication decorator
 def login_required(f):
     @wraps(f)
