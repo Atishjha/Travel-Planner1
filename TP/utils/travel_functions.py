@@ -905,25 +905,58 @@ def generate_itinerary(destination: str, start_date: str, end_date: str,
                       interests: List[str], num_people: int, 
                       budget_info: Dict[str, Any], country: str = None) -> str:
     """Enhanced with visual elements and improved formatting"""
-     try:
-        # Validate required fields
-        if not all(key in budget_info for key in ['flight_cost', 'total_estimated']):
-            raise ValueError("Missing required budget information")
     try:
-        num_days = (datetime.strptime(end_date, "%d %B %Y") - datetime.strptime(start_date, "%d %B %Y")).days + 1
+        # Validate required budget fields first
+        if not all(key in budget_info for key in ['flight_cost', 'total_estimated', 'remaining']):
+            raise ValueError("Missing required budget information")
         
-        # Get destination info again for visa details
-        dest_info = get_destination_info(destination, country)
-        
-        # Construct location string with country if provided
+        # Validate numeric budget values
+        try:
+            remaining = float(budget_info['remaining'])
+            total_estimated = float(budget_info['total_estimated'])
+            flight_cost = float(budget_info['flight_cost'])
+        except (ValueError, TypeError):
+            raise ValueError("Invalid budget values")
+
+        # Validate and calculate trip duration
+        try:
+            start_dt = datetime.strptime(start_date, "%d %B %Y")
+            end_dt = datetime.strptime(end_date, "%d %B %Y")
+            if end_dt < start_dt:
+                raise ValueError("End date cannot be before start date")
+            num_days = (end_dt - start_dt).days + 1
+        except ValueError as e:
+            raise ValueError(f"Invalid date format: {str(e)}")
+
+        # Get destination info with fallback
+        try:
+            dest_info = get_destination_info(destination, country)
+            # Ensure required visa fields exist
+            visa_fields = ['visa_type', 'visa_cost', 'visa_process', 'visa_chance']
+            for field in visa_fields:
+                if field not in dest_info:
+                    dest_info[field] = "Information not available"
+        except Exception as e:
+            print(f"Error getting destination info: {str(e)}")
+            dest_info = {
+                'name': destination,
+                'country': country or 'Unknown',
+                'visa_type': 'Check embassy',
+                'visa_cost': 0,
+                'visa_process': 'Information not available',
+                'visa_chance': 'medium',
+                'images': [],
+                'traveler_insights': 'No insights available'
+            }
+
+        # Rest of your function remains the same...
         location = f"{destination}, {country}" if country else destination
         
-        # Format budget status message with visual indicators
-        if budget_info['remaining'] >= 0:
-            budget_status = f"✅ Within budget (remaining: ₹{budget_info['remaining']:,.2f})"
+        if remaining >= 0:
+            budget_status = f"✅ Within budget (remaining: ₹{remaining:,.2f})"
             budget_emoji = "💰"
         else:
-            budget_status = f"⚠️ Over budget by ₹{abs(budget_info['remaining']):,.2f}"
+            budget_status = f"⚠️ Over budget by ₹{abs(remaining):,.2f}"
             budget_emoji = "💸"
         
         # Create a visually appealing header
