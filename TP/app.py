@@ -19,13 +19,7 @@ from functools import wraps
 import json
 
 app = Flask(__name__)
-with closing(get_db_connection()) as conn:
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT to_regclass('public.users')")
-        table_exists = cursor.fetchone()[0]
-        
-if not table_exists:
-    init_database()
+
 # Configuration
 app.secret_key = 'your-secret-key-change-this-in-production'  # Change this!
 genai.configure(api_key="AIzaSyDW4BCGnID5zsxrjDX1DNu23-Fn4tkH_Hw")
@@ -95,7 +89,13 @@ CREATE TABLE IF NOT EXISTS travel_history (
 
 
             
-
+with closing(get_db_connection()) as conn:
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT to_regclass('public.users')")
+        table_exists = cursor.fetchone()[0]
+        
+if not table_exists:
+    init_database()
 # Authentication decorator
 def login_required(f):
     @wraps(f)
