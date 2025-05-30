@@ -49,47 +49,56 @@ def get_db_connection():
         print(f"Error connecting to PostgreSQL: {e}")
         return None
 
-'''# Initialize database tables
 def init_database():
     """Create necessary tables if they don't exist"""
     connection = get_db_connection()
     if connection:
         cursor = connection.cursor()
         
-        # Users table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(80) UNIQUE NOT NULL,
-                email VARCHAR(120) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Travel history table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS travel_history (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                destination VARCHAR(255) NOT NULL,
-                country VARCHAR(100),
-                start_date DATE,
-                end_date DATE,
-                budget DECIMAL(10, 2),
-                num_people INT,
-                interests JSON,
-                itinerary JSON,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            )
-        ''')
-        
-        connection.commit()
-        cursor.close()
-        connection.close()
-        print("Database initialized successfully")
-'''
+        try:
+            # Users table (PostgreSQL syntax)
+            cursor.execute('''
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(80) UNIQUE NOT NULL,
+    email VARCHAR(120) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+            '''.strip())
+            
+            # Travel history table (PostgreSQL syntax)
+            cursor.execute('''
+CREATE TABLE IF NOT EXISTS travel_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    destination VARCHAR(255) NOT NULL,
+    country VARCHAR(100),
+    start_date DATE,
+    end_date DATE,
+    budget DECIMAL(10, 2),
+    num_people INTEGER,
+    interests JSONB,
+    itinerary JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+)
+            '''.strip())
+            
+            connection.commit()
+            print("Database initialized successfully")
+        except Exception as e:
+            print(f"Error initializing database: {e}")
+            connection.rollback()
+        finally:
+            cursor.close()
+            connection.close()
+
+# Make sure to call this function when your application starts
+if __name__ == '__main__':
+    init_database()
+    app.run()
+            
 def init_database():
     """Create necessary tables if they don't exist"""
     connection = get_db_connection()
