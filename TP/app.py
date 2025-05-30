@@ -260,18 +260,40 @@ def signup():
             return render_template('signup.html')
         
         # Check if user already exists
-        if get_user_by_username(username):
+        existing_user = get_user_by_username(username)
+        if existing_user:
             flash('Username already exists.', 'error')
             return render_template('signup.html')
         
+        # Check if email already exists
+        connection = get_db_connection()
+        if connection:
+            try:
+                cursor = connection.cursor()
+                cursor.execute('SELECT id FROM users WHERE email = %s', (email,))
+                if cursor.fetchone():
+                    flash('Email already exists.', 'error')
+                    return render_template('signup.html')
+            except Exception as e:
+                print(f"Error checking email: {e}")
+                flash('Error checking email availability.', 'error')
+                return render_template('signup.html')
+            finally:
+                cursor.close()
+                connection.close()
+        
         # Create user
-        user_id = create_user(username, email, password)
-        if user_id:
-            session['user_id'] = user_id
-            session['username'] = username
-            flash('Account created successfully!', 'success')
-            return redirect(url_for('home'))
-        else:
+        try:
+            user_id = create_user(username, email, password)
+            if user_id:
+                session['user_id'] = user_id
+                session['username'] = username
+                flash('Account created successfully!', 'success')
+                return redirect(url_for('home'))
+            else:
+                flash('Error creating account. Please try again.', 'error')
+        except Exception as e:
+            print(f"Error during user creation: {e}")
             flash('Error creating account. Please try again.', 'error')
     
     return render_template('signup.html')
@@ -303,7 +325,54 @@ def logout():
     session.clear()
     flash('Logged out successfully!', 'success')
     return redirect(url_for('home'))
+@app.route('/healthcheck')
+def healthcheck():
+    """Endpoint to check basic app health"""
+    try:
+        # Test database connection
+        conn = get_db_connection()
+        if conn:
+            conn.close()
+            return jsonify({
+                'status': 'healthy',
+                'database': 'connected'
+            }), 200
+        return jsonify({
+            'status': 'unhealthy',
+            'database': 'disconnected'
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
 
+@app.route('/test-signup', methods=['POST'])
+def test_signup():
+    """Test endpoint for signup functionality"""
+    try:
+        # Test user creation
+        test_user = {
+            'username': 'testuser_' + str(datetime.now().timestamp()),
+            'email': f'test_{datetime.now().timestamp()}@example.com',
+            'password': 'testpassword123'
+        }
+        
+        user_id = create_user(test_user['username'], test_user['email'], test_user['password'])
+        if user_id:
+            return jsonify({
+                'success': True,
+                'user_id': user_id
+            }), 200
+        return jsonify({
+            'success': False,
+            'error': 'User creation failed'
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 @app.route('/profile')
 @login_required
 def profile():
