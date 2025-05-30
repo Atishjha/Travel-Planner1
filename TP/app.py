@@ -11,7 +11,8 @@ from utils.travel_functions import (
 )
 import os
 import psycopg2
-from psycopg2 import OperationalError,DictCursor
+from psycopg2 import OperationalError
+from psycopg2.extras import DictCursor
 from functools import wraps
 import json
 
