@@ -49,8 +49,8 @@ def get_db_connection():
         print(f"Error connecting to PostgreSQL: {e}")
         return None
 
-# Initialize database tables
-'''def init_database():
+'''# Initialize database tables
+def init_database():
     """Create necessary tables if they don't exist"""
     connection = get_db_connection()
     if connection:
@@ -237,8 +237,8 @@ def get_user_travel_history(user_id):
         try:
             cursor.execute('''
                 SELECT id, user_id, destination, country, 
-                       DATE_FORMAT(start_date, '%%Y-%%m-%%d') as start_date,
-                       DATE_FORMAT(end_date, '%%Y-%%m-%%d') as end_date,
+                       to_char(start_date, 'YYYY-MM-DD') as start_date,
+                       to_char(end_date, 'YYYY-MM-DD') as end_date,
                        budget, num_people, interests, itinerary, 
                        created_at
                 FROM travel_history 
