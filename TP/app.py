@@ -13,8 +13,8 @@ from utils.travel_functions import (
 )
 import os
 import psycopg2
-from psycopg2 import OperationalError
-from psycopg2.extras import DictCursor
+from psycopg2 import OperationalError, IntegrityError
+from psycopg2.extras import DictCursor, RealDictCursor
 from functools import wraps
 import json
 
@@ -42,6 +42,7 @@ def get_db_connection():
     except OperationalError as e:
         print(f"Error connecting to PostgreSQL: {e}")
         return None
+
 def init_database():
     """Create necessary tables if they don't exist"""
     connection = get_db_connection()
@@ -58,7 +59,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
-            '''.strip())
+            ''')
             
             # Travel history table (PostgreSQL syntax)
             cursor.execute('''
@@ -76,26 +77,51 @@ CREATE TABLE IF NOT EXISTS travel_history (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 )
-            '''.strip())
+            ''')
             
             connection.commit()
             print("Database initialized successfully")
+            return True
         except Exception as e:
             print(f"Error initializing database: {e}")
             connection.rollback()
+            return False
         finally:
             cursor.close()
             connection.close()
+    return False
 
-
+# Fixed database initialization check
+def check_and_init_database():
+    """Check if tables exist and initialize if needed"""
+    connection = get_db_connection()
+    if connection:
+        try:
+            cursor = connection.cursor()
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = 'users'
+                );
+            """)
+            table_exists = cursor.fetchone()[0]
             
-with closing(get_db_connection()) as conn:
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT to_regclass('public.users')")
-        table_exists = cursor.fetchone()[0]
-        
-if not table_exists:
-    init_database()
+            if not table_exists:
+                cursor.close()
+                connection.close()
+                return init_database()
+            
+            cursor.close()
+            connection.close()
+            return True
+        except Exception as e:
+            print(f"Error checking database: {e}")
+            if connection:
+                connection.close()
+            return False
+    return False
+
 # Authentication decorator
 def login_required(f):
     @wraps(f)
@@ -108,130 +134,158 @@ def login_required(f):
 
 # User management functions
 def create_user(username, email, password):
-    """Create a new user"""
+    """Create a new user - FIXED VERSION"""
     connection = get_db_connection()
-    if connection:
+    if not connection:
+        print("Failed to get database connection")
+        return None
+    
+    try:
         cursor = connection.cursor()
         password_hash = generate_password_hash(password)
         
-        try:
-            cursor.execute(
-                'INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s)',
-                (username, email, password_hash)
-            )
-            connection.commit()
-            user_id = cursor.lastrowid
-            cursor.close()
-            connection.close()
-            return user_id
-        except OperationalError as e:
-            cursor.close()
-            connection.close()
-            return None
-    return None
+        # Use RETURNING clause to get the new user ID
+        cursor.execute(
+            'INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s) RETURNING id',
+            (username, email, password_hash)
+        )
+        
+        user_id = cursor.fetchone()[0]  # Get the returned ID
+        connection.commit()
+        
+        print(f"Successfully created user with ID: {user_id}")
+        return user_id
+        
+    except IntegrityError as e:
+        print(f"Integrity error creating user: {e}")
+        connection.rollback()
+        return None
+    except Exception as e:
+        print(f"Error creating user: {e}")
+        connection.rollback()
+        return None
+    finally:
+        cursor.close()
+        connection.close()
 
 def get_user_by_username(username):
     """Get user by username"""
     connection = get_db_connection()
-    if connection:
-        cursor = connection.cursor(cursor_factory=DictCursor)
+    if not connection:
+        return None
+        
+    try:
+        cursor = connection.cursor(cursor_factory=RealDictCursor)  # Fixed cursor factory
         cursor.execute('SELECT * FROM users WHERE username = %s', (username,))
         user = cursor.fetchone()
+        return dict(user) if user else None  # Convert to regular dict
+    except Exception as e:
+        print(f"Error getting user by username: {e}")
+        return None
+    finally:
         cursor.close()
         connection.close()
-        return user
-    return None
 
 def get_user_by_id(user_id):
-    """Get user by ID"""
+    """Get user by ID - FIXED VERSION"""
     connection = get_db_connection()
-    if connection:
-        cursor = connection.cursor(dictionary=True)
+    if not connection:
+        return None
+        
+    try:
+        cursor = connection.cursor(cursor_factory=RealDictCursor)  # Fixed: was using MySQL syntax
         cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))
         user = cursor.fetchone()
+        return dict(user) if user else None  # Convert to regular dict
+    except Exception as e:
+        print(f"Error getting user by ID: {e}")
+        return None
+    finally:
         cursor.close()
         connection.close()
-        return user
-    return None
 
 def save_travel_history(user_id, destination, country, start_date, end_date, budget, num_people, interests, itinerary):
     """Save travel itinerary to history"""
     connection = get_db_connection()
-    if connection:
+    if not connection:
+        return False
+        
+    try:
         cursor = connection.cursor()
         
-        try:
-            # Convert itinerary to proper JSON format
-            if isinstance(itinerary, str):
-                try:
-                    # Try to parse if it's already JSON string
-                    json.loads(itinerary)
-                    itinerary_json = itinerary
-                except json.JSONDecodeError:
-                    # If plain text, convert to JSON object
-                    itinerary_json = json.dumps({"content": itinerary})
-            else:
-                itinerary_json = json.dumps(itinerary)
-            
-            cursor.execute('''
-                INSERT INTO travel_history 
-                (user_id, destination, country, start_date, end_date, budget, num_people, interests, itinerary)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (user_id, destination, country, start_date, end_date, 
-                  budget, num_people, json.dumps(interests), itinerary_json))
-            
-            connection.commit()
-            return True
-        except OperationalError as e:
-            print(f"Error saving travel history: {e}")
-            return False
-        finally:
-            cursor.close()
-            connection.close()
-    return False
-
+        # Convert itinerary to proper JSON format
+        if isinstance(itinerary, str):
+            try:
+                # Try to parse if it's already JSON string
+                json.loads(itinerary)
+                itinerary_json = itinerary
+            except json.JSONDecodeError:
+                # If plain text, convert to JSON object
+                itinerary_json = json.dumps({"content": itinerary})
+        else:
+            itinerary_json = json.dumps(itinerary)
+        
+        cursor.execute('''
+            INSERT INTO travel_history 
+            (user_id, destination, country, start_date, end_date, budget, num_people, interests, itinerary)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (user_id, destination, country, start_date, end_date, 
+              budget, num_people, json.dumps(interests), itinerary_json))
+        
+        connection.commit()
+        return True
+    except Exception as e:
+        print(f"Error saving travel history: {e}")
+        connection.rollback()
+        return False
+    finally:
+        cursor.close()
+        connection.close()
 
 def get_user_travel_history(user_id):
-    """Get user's travel history"""
+    """Get user's travel history - FIXED VERSION"""
     connection = get_db_connection()
-    if connection:
-        cursor = connection.cursor(dictionary=True)
-        try:
-            cursor.execute('''
-                SELECT id, user_id, destination, country, 
-                       to_char(start_date, 'YYYY-MM-DD') as start_date,
-                       to_char(end_date, 'YYYY-MM-DD') as end_date,
-                       budget, num_people, interests, itinerary, 
-                       created_at
-                FROM travel_history 
-                WHERE user_id = %s 
-                ORDER BY created_at DESC
-            ''', (user_id,))
-            history = cursor.fetchall()
+    if not connection:
+        return []
+        
+    try:
+        cursor = connection.cursor(cursor_factory=RealDictCursor)  # Fixed: was using MySQL syntax
+        cursor.execute('''
+            SELECT id, user_id, destination, country, 
+                   to_char(start_date, 'YYYY-MM-DD') as start_date,
+                   to_char(end_date, 'YYYY-MM-DD') as end_date,
+                   budget, num_people, interests, itinerary, 
+                   created_at
+            FROM travel_history 
+            WHERE user_id = %s 
+            ORDER BY created_at DESC
+        ''', (user_id,))
+        
+        history = cursor.fetchall()
+        history_list = [dict(row) for row in history]  # Convert to list of dicts
+        
+        # Parse JSON fields with error handling
+        for item in history_list:
+            try:
+                if item['interests']:
+                    item['interests'] = json.loads(item['interests'])
+            except (json.JSONDecodeError, TypeError):
+                item['interests'] = []
             
-            # Parse JSON fields with error handling
-            for item in history:
-                try:
-                    if item['interests']:
-                        item['interests'] = json.loads(item['interests'])
-                except (json.JSONDecodeError, TypeError):
-                    item['interests'] = []
-                
-                try:
-                    if item['itinerary']:
-                        item['itinerary'] = json.loads(item['itinerary'])
-                except (json.JSONDecodeError, TypeError):
-                    # If not valid JSON, treat as plain text
-                    item['itinerary'] = {"content": item['itinerary']}
-            
-            return history
-        except OperationalError as e:
-            print(f"Error fetching travel history: {e}")
-            return []
-        finally:
-            cursor.close()
-            connection.close()
-    return []
+            try:
+                if item['itinerary']:
+                    item['itinerary'] = json.loads(item['itinerary'])
+            except (json.JSONDecodeError, TypeError):
+                # If not valid JSON, treat as plain text
+                item['itinerary'] = {"content": item['itinerary']}
+        
+        return history_list
+    except Exception as e:
+        print(f"Error fetching travel history: {e}")
+        return []
+    finally:
+        cursor.close()
+        connection.close()
 
 # Routes
 @app.route('/')
@@ -325,6 +379,7 @@ def logout():
     session.clear()
     flash('Logged out successfully!', 'success')
     return redirect(url_for('home'))
+
 @app.route('/healthcheck')
 def healthcheck():
     """Endpoint to check basic app health"""
@@ -373,6 +428,7 @@ def test_signup():
             'success': False,
             'error': str(e)
         }), 500
+
 @app.route('/profile')
 @login_required
 def profile():
@@ -449,9 +505,6 @@ def recommendations():
                             recommendations=basic_recs,
                             interests=interests,
                             continent=continent)
-        
- 
-
 
 @app.route('/itinerary', methods=['POST'])
 @login_required
@@ -521,8 +574,8 @@ def itinerary():
     except Exception as e:
         flash(f"Error generating itinerary: {str(e)}", "error")
         return redirect(url_for('home'))
+
 # API endpoints for AJAX calls
-# API endpoints for AJAX calls (example)
 @app.route('/api/destination_info', methods=['POST'])
 def api_destination_info():
     try:
@@ -536,17 +589,15 @@ def api_destination_info():
         if not destination:
             return jsonify({'error': 'Destination is required'}), 400
         
-        # model = genai.GenerativeModel('gemini-1.5-flash') # Initialize if get_destination_info needs it
-        info = get_destination_info(destination, country) # Pass model if needed
+        info = get_destination_info(destination, country)
         
-        if "error" in info: # Assuming get_destination_info returns a dict with an 'error' key on failure
+        if "error" in info:
             return jsonify({'error': info['error']}), 500
         return jsonify(info)
 
     except Exception as e:
         print(f"API Error (destination_info): {e}")
         return jsonify({'error': 'Failed to get destination information due to an internal error.'}), 500
-
 
 @app.route('/api/recommendations', methods=['POST'])
 def api_recommendations():
@@ -568,7 +619,7 @@ def api_recommendations():
             return jsonify({'error': 'At least one interest is required'}), 400
         
         app.logger.info(f"Calling recommend_destinations_for_interests with: interests={interests}, continent={continent}, max_results={max_results}")
-        model = genai.GenerativeModel('gemini-1.5-flash') # Changed model
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         recs = recommend_destinations_for_interests(
             model, 
@@ -591,8 +642,7 @@ def api_recommendations():
         app.logger.error(f"Unhandled exception in /api/recommendations: {e}", exc_info=True) 
         return jsonify({'error': 'Failed to generate recommendations due to an internal server error.'}), 500
 
-
-# Utility function for input validation (as provided by you, slightly modified)
+# Utility function for input validation
 def validate_trip_input(destination, start_date_str, end_date_str, budget, num_people):
     """Validate all trip input parameters"""
     if not destination or not destination.strip():
@@ -600,8 +650,6 @@ def validate_trip_input(destination, start_date_str, end_date_str, budget, num_p
     if not start_date_str or not end_date_str:
         raise ValueError("Start and end dates are required.")
     
-    # Budget and num_people are likely already validated as float/int before this call,
-    # but good to have checks if called directly.
     if not isinstance(budget, (int, float)) or budget <= 0:
         raise ValueError("Budget must be a positive number.")
     if not isinstance(num_people, int) or num_people <= 0:
@@ -610,20 +658,18 @@ def validate_trip_input(destination, start_date_str, end_date_str, budget, num_p
     try:
         start = datetime.strptime(start_date_str, '%Y-%m-%d')
         end = datetime.strptime(end_date_str, '%Y-%m-%d')
-        if end < start: # Allow same day trips, so use < not <=
+        if end < start:
             raise ValueError("End date must be on or after start date.")
-        if (end - start).days > 365: # Example limit
+        if (end - start).days > 365:
             raise ValueError("Trip duration cannot exceed 365 days.")
     except ValueError as e:
-        # Re-raise with a more user-friendly message if it's a date parsing error
         if "time data" in str(e) or "format" in str(e):
             raise ValueError("Invalid date format. Please use YYYY-MM-DD.")
-        raise e # Re-raise other ValueErrors (like end date before start)
-
+        raise e
 
 if __name__ == '__main__':
-    # Initialize database on startup (consider if this should be manual or conditional)
-    # init_database() # You might want to run this as a separate script/command
+    # Initialize database on startup
+    check_and_init_database()
     
     # Set Flask environment and debug mode from environment variables
     flask_env = os.environ.get('FLASK_ENV', 'development')
@@ -632,14 +678,9 @@ if __name__ == '__main__':
     if flask_env == 'production':
         app.config.update(
             TEMPLATES_AUTO_RELOAD=False,
-            SESSION_COOKIE_SECURE=True, # Ensure HTTPS in production
+            SESSION_COOKIE_SECURE=True,
             SESSION_COOKIE_HTTPONLY=True,
             SESSION_COOKIE_SAMESITE='Lax',
         )
     
-    # Make sure to call init_database() if you want tables created on app start
-    # For development, it's fine. For production, you might use migrations.
-    with app.app_context(): # Ensures a_c is active for db init if it needs it
-        init_database()
-
     app.run(debug=debug_mode, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
