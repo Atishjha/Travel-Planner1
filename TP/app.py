@@ -48,7 +48,6 @@ def get_db_connection():
     except OperationalError as e:
         print(f"Error connecting to PostgreSQL: {e}")
         return None
-
 def init_database():
     """Create necessary tables if they don't exist"""
     connection = get_db_connection()
@@ -94,55 +93,9 @@ CREATE TABLE IF NOT EXISTS travel_history (
             cursor.close()
             connection.close()
 
-# Make sure to call this function when your application starts
-if __name__ == '__main__':
-    init_database()
-    app.run()
+
             
-def init_database():
-    """Create necessary tables if they don't exist"""
-    connection = get_db_connection()
-    if connection:
-        cursor = connection.cursor()
-        
-        try:
-            # Users table (PostgreSQL syntax)
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    username VARCHAR(80) UNIQUE NOT NULL,
-                    email VARCHAR(120) UNIQUE NOT NULL,
-                    password_hash VARCHAR(255) NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # Travel history table (PostgreSQL syntax)
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS travel_history (
-                    id SERIAL PRIMARY KEY,
-                    user_id INT NOT NULL,
-                    destination VARCHAR(255) NOT NULL,
-                    country VARCHAR(100),
-                    start_date DATE,
-                    end_date DATE,
-                    budget DECIMAL(10, 2),
-                    num_people INT,
-                    interests JSONB,
-                    itinerary JSONB,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                )
-            ''')
-            
-            connection.commit()
-            print("Database initialized successfully")
-        except Exception as e:
-            print(f"Error initializing database: {e}")
-            connection.rollback()
-        finally:
-            cursor.close()
-            connection.close()
+
 # Authentication decorator
 def login_required(f):
     @wraps(f)
