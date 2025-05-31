@@ -376,7 +376,7 @@ def debug_budget_info(budget_info: Dict[str, Any]) -> None:
     
     print("=" * 50)
 
-def get_destination_info_safe(destination: str, country: str = None) -> Dict[str, Any]:
+def get_destination_info(destination: str, country: str = None) -> Dict[str, Any]:
     """
     Enhanced version of get_destination_info with better error handling
     """
