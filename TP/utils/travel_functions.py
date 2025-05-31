@@ -424,10 +424,9 @@ def get_destination_info(destination: str, country: str = None) -> dict:
         try:
             # Try to parse the JSON response
             dest_info = json.loads(response.text)
-            flight_cost = dest_info.get("flight_cost", 40000)
-            if not isinstance(flight_cost, (int, float)) or flight_cost <= 0:
-              
-              print(f"Invalid flight cost received: {flight_cost}. Using default value.")
+            flight_cost = dest_info.get("flight_cost")
+            if flight_cost is None or not isinstance(flight_cost, (int, float)) or flight_cost <= 0:
+              print(f"Invalid flight cost for {destination}, using default 40000")
               flight_cost = 40000
             # Handle the case where daily_hotel might be a dictionary or a single value
             if isinstance(dest_info.get("daily_hotel", {}), dict):
@@ -445,7 +444,7 @@ def get_destination_info(destination: str, country: str = None) -> dict:
                 "budget": dest_info.get("budget_category", "medium"),
                 "interests": dest_info.get("interests", ["sightseeing"]),
                 "best_season": dest_info.get("best_season", "year-round"),
-                "flight_cost": dest_info.get("flight_cost", 40000),
+                "flight_cost": flight_cost,
                 "daily_hotel": daily_hotel,
                 "daily_food": dest_info.get("daily_food", 1500),
                 "daily_activities": dest_info.get("daily_activities", 1500),
