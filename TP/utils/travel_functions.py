@@ -424,7 +424,11 @@ def get_destination_info(destination: str, country: str = None) -> dict:
         try:
             # Try to parse the JSON response
             dest_info = json.loads(response.text)
-            
+            flight_cost = dest_info.get("flight_cost", 40000)
+            if not isinstance(flight_cost, (int, float)) or flight_cost <= 0:
+              
+              print(f"Invalid flight cost received: {flight_cost}. Using default value.")
+              flight_cost = 40000
             # Handle the case where daily_hotel might be a dictionary or a single value
             if isinstance(dest_info.get("daily_hotel", {}), dict):
                 daily_hotel = dest_info["daily_hotel"].get("mid_range", 2500)
