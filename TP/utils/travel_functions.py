@@ -367,9 +367,35 @@ def get_destination_info(destination: str, country: str = None) -> dict:
             # Get continent info first
             continent_info = get_continent_info(destination)
             
+            # Ensure continent_info has required keys with defaults
+            if not isinstance(continent_info, dict):
+                continent_info = {}
+            
+            # Add missing required keys with defaults
+            continent_info.setdefault("flight_cost", 40000)
+            continent_info.setdefault("daily_hotel", 2500)
+            continent_info.setdefault("daily_food", 1500)
+            continent_info.setdefault("daily_activities", 1500)
+            continent_info.setdefault("visa_cost", 0)
+            continent_info.setdefault("visa_type", "Varies by country")
+            continent_info.setdefault("visa_process", "Varies by destination country")
+            continent_info.setdefault("visa_chance", "medium")
+            continent_info.setdefault("name", destination)
+            continent_info.setdefault("country", "Multiple countries")
+            continent_info.setdefault("budget", "medium")
+            continent_info.setdefault("interests", ["sightseeing", "culture"])
+            continent_info.setdefault("best_season", "year-round")
+            
             # Add images and traveler insights
-            continent_info["images"] = get_destination_images_with_gemini(destination, country, num_images=3)
-            continent_info["traveler_insights"] = generate_traveler_insights(destination, country)
+            try:
+                continent_info["images"] = get_destination_images_with_gemini(destination, country, num_images=3)
+            except:
+                continent_info["images"] = []
+                
+            try:
+                continent_info["traveler_insights"] = generate_traveler_insights(destination, country)
+            except:
+                continent_info["traveler_insights"] = "No traveler insights available."
             
             return continent_info
             
@@ -424,103 +450,100 @@ def get_destination_info(destination: str, country: str = None) -> dict:
         try:
             # Try to parse the JSON response
             dest_info = json.loads(response.text)
+            
+            # Validate and set flight_cost with proper error handling
             flight_cost = dest_info.get("flight_cost")
             if flight_cost is None or not isinstance(flight_cost, (int, float)) or flight_cost <= 0:
-              print(f"Invalid flight cost for {destination}, using default 40000")
-              flight_cost = 40000
+                print(f"Invalid flight cost for {destination}, using default 40000")
+                flight_cost = 40000
+            
             # Handle the case where daily_hotel might be a dictionary or a single value
-            if isinstance(dest_info.get("daily_hotel", {}), dict):
-                daily_hotel = dest_info["daily_hotel"].get("mid_range", 2500)
-            else:
-                daily_hotel = dest_info.get("daily_hotel", 2500)
+            daily_hotel = 2500  # Default value
+            hotel_data = dest_info.get("daily_hotel")
+            if isinstance(hotel_data, dict):
+                daily_hotel = hotel_data.get("mid_range", 2500)
+            elif isinstance(hotel_data, (int, float)) and hotel_data > 0:
+                daily_hotel = hotel_data
             
             # Get country information if available
             country_info = dest_info.get("country", country if country else "Unknown")
                 
-            # Create a standardized destination info dictionary
+            # Create a standardized destination info dictionary with all required fields
             result = {
                 "name": destination,
                 "country": country_info,
                 "budget": dest_info.get("budget_category", "medium"),
-                "interests": dest_info.get("interests", ["sightseeing"]),
+                "interests": dest_info.get("interests", ["sightseeing"]) if isinstance(dest_info.get("interests"), list) else ["sightseeing"],
                 "best_season": dest_info.get("best_season", "year-round"),
-                "flight_cost": flight_cost,
-                "daily_hotel": daily_hotel,
-                "daily_food": dest_info.get("daily_food", 1500),
-                "daily_activities": dest_info.get("daily_activities", 1500),
-                "visa_cost": dest_info.get("visa_cost", 0),
-                "visa_type": dest_info.get("visa_type", "Tourist Visa"),
-                "visa_process": dest_info.get("visa_process", "Check with embassy for latest requirements"),
-                "visa_chance": dest_info.get("visa_chance", "medium")
+                "flight_cost": int(flight_cost),  # Ensure it's an integer
+                "daily_hotel": int(daily_hotel),  # Ensure it's an integer
+                "daily_food": int(dest_info.get("daily_food", 1500)) if isinstance(dest_info.get("daily_food"), (int, float)) else 1500,
+                "daily_activities": int(dest_info.get("daily_activities", 1500)) if isinstance(dest_info.get("daily_activities"), (int, float)) else 1500,
+                "visa_cost": int(dest_info.get("visa_cost", 0)) if isinstance(dest_info.get("visa_cost"), (int, float)) else 0,
+                "visa_type": str(dest_info.get("visa_type", "Tourist Visa")),
+                "visa_process": str(dest_info.get("visa_process", "Check with embassy for latest requirements")),
+                "visa_chance": str(dest_info.get("visa_chance", "medium"))
             }
             
-            # Add images using our new function
-            result["images"] = get_destination_images_with_gemini(destination, country)
+            # Add images using our new function with error handling
+            try:
+                result["images"] = get_destination_images_with_gemini(destination, country)
+            except Exception as img_error:
+                print(f"Error getting images: {img_error}")
+                result["images"] = []
             
-            # Add traveler insights
-            result["traveler_insights"] = generate_traveler_insights(destination, country)
+            # Add traveler insights with error handling
+            try:
+                result["traveler_insights"] = generate_traveler_insights(destination, country)
+            except Exception as insights_error:
+                print(f"Error getting traveler insights: {insights_error}")
+                result["traveler_insights"] = "No traveler insights available."
             
             return result
             
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as json_error:
             # If JSON parsing fails, use fallback values
-            print(f"Error parsing destination data for {location}. Using default values.")
-            result = {
-                "name": destination,
-                "country": country if country else "Unknown",
-                "budget": "medium",
-                "interests": ["sightseeing", "culture", "food"],
-                "best_season": "year-round",
-                "flight_cost": 40000,
-                "daily_hotel": 2500,
-                "daily_food": 1500,
-                "daily_activities": 1500,
-                "visa_cost": 3000,
-                "visa_type": "Tourist Visa",
-                "visa_process": "Check with embassy for latest requirements",
-                "visa_chance": "medium"
-            }
-            
-            # Add images using our new function
-            result["images"] = get_destination_images_with_gemini(destination, country)
-            
-            # Add traveler insights
-            result["traveler_insights"] = generate_traveler_insights(destination, country)
-            
-            return result
+            print(f"Error parsing destination data for {location}: {json_error}. Using default values.")
+            return create_default_destination_info(destination, country)
             
     except Exception as e:
         print(f"Error getting destination info: {str(e)}")
-        # Create a basic response with default values
-        result = {
-            "name": destination,
-            "country": country if country else "Unknown",
-            "budget": "medium",
-            "interests": ["sightseeing", "culture", "food"],
-            "best_season": "year-round",
-            "flight_cost": 40000,
-            "daily_hotel": 2500,
-            "daily_food": 1500,
-            "daily_activities": 1500,
-            "visa_cost": 3000,
-            "visa_type": "Tourist Visa",
-            "visa_process": "Check with embassy for latest requirements",
-            "visa_chance": "medium"
-        }
+        return create_default_destination_info(destination, country)
+
+
+def create_default_destination_info(destination: str, country: str = None) -> dict:
+    """
+    Create a default destination info dictionary with all required fields
+    """
+    result = {
+        "name": destination,
+        "country": country if country else "Unknown",
+        "budget": "medium",
+        "interests": ["sightseeing", "culture", "food"],
+        "best_season": "year-round",
+        "flight_cost": 40000,
+        "daily_hotel": 2500,
+        "daily_food": 1500,
+        "daily_activities": 1500,
+        "visa_cost": 3000,
+        "visa_type": "Tourist Visa",
+        "visa_process": "Check with embassy for latest requirements",
+        "visa_chance": "medium"
+    }
+    
+    # Try to add images even if other parts failed
+    try:
+        result["images"] = get_destination_images_with_gemini(destination, country)
+    except:
+        result["images"] = []
         
-        # Try to add images even if other parts failed
-        try:
-            result["images"] = get_destination_images_with_gemini(destination, country)
-        except:
-            result["images"] = []
-            
-        # Try to add traveler insights even if other parts failed
-        try:
-            result["traveler_insights"] = generate_traveler_insights(destination, country)
-        except:
-            result["traveler_insights"] = "No traveler insights available."
-            
-        return result
+    # Try to add traveler insights even if other parts failed
+    try:
+        result["traveler_insights"] = generate_traveler_insights(destination, country)
+    except:
+        result["traveler_insights"] = "No traveler insights available."
+        
+    return result
 def get_continent_info(continent: str) -> dict:
     """
     Get predefined information for continental destinations
