@@ -505,7 +505,8 @@ def recommendations():
                             recommendations=basic_recs,
                             interests=interests,
                             continent=continent)
-
+        
+ 
 @app.route('/itinerary', methods=['POST'])
 @login_required
 def itinerary():
@@ -516,49 +517,67 @@ def itinerary():
         start_date_str = request.form.get('start_date')
         end_date_str = request.form.get('end_date')
         interests = request.form.getlist('interests')
-        budget = float(request.form.get('budget'))
+        budget = float(request.form.get('budget', 0))
         num_people = int(request.form.get('num_people', 1))
-        
-        # Validate inputs
+
+        # Validate inputs first
         validate_trip_input(destination, start_date_str, end_date_str, budget, num_people)
+
+        # Convert to datetime objects (keep original strings for saving)
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d') if start_date_str else None
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d') if end_date_str else None
         
-        # Convert dates
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').strftime('%d %B %Y')
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').strftime('%d %B %Y')
-        num_days = (datetime.strptime(end_date_str, '%Y-%m-%d') - 
-                   datetime.strptime(start_date_str, '%Y-%m-%d')).days + 1
+        # Calculate number of days
+        if start_date and end_date:
+            num_days = (end_date - start_date).days + 1
+        else:
+            num_days = 1  # default value if dates aren't provided (though validation should prevent this)
+        # Validate inputs
         
-        # Get destination info - you might want to enhance this
-        dest_info = {
-            'name': destination,
-            'country': country or '',
-            'description': f"Travel destination: {destination}" + 
-                          (f", {country}" if country else "")
-        }
+
         
+
+        # Get destination info
+        dest_info = get_destination_info(destination, country) or {}
+        if not dest_info:
+            flash('Could not retrieve destination information', 'error')
+            return redirect(url_for('home'))
+
         # Calculate budget
         budget_info = calculate_budget_breakdown(
-            dest_info, budget, num_days, num_people
+            destination_info=dest_info,
+            total_budget=budget,
+            num_days=num_days,
+            num_people=num_people
         )
-        
-        # Generate itinerary
+
+        # Generate itinerary - pass dates as strings to avoid the error
         itinerary = generate_itinerary(
-            destination, 
-            start_date,
-            end_date,
-            interests,
-            num_people,
-            budget_info,
-            country
+            destination=destination,
+            start_date=start_date_str,  # Pass as string instead of datetime
+            end_date=end_date_str,      # Pass as string instead of datetime
+            interests=interests,
+            num_people=num_people,
+            budget_info=budget_info,
+            country=country
         )
-        
-        # Save to history
-        save_travel_history(
-            session['user_id'], destination, country, 
-            start_date_str, end_date_str,  # Store in YYYY-MM-DD format
-            budget, num_people, interests, itinerary
+
+        # Save to history - use the original string dates
+        save_success = save_travel_history(
+            user_id=session['user_id'],
+            destination=destination,
+            country=country,
+            start_date=start_date_str,
+            end_date=end_date_str,
+            budget=budget,
+            num_people=num_people,
+            interests=interests,
+            itinerary=itinerary
         )
-        
+
+        if not save_success:
+            flash('Itinerary generated but failed to save history', 'warning')
+
         return render_template('itinerary.html',
                             destination=dest_info,
                             country=country,
@@ -567,15 +586,19 @@ def itinerary():
                             num_days=num_days,
                             num_people=num_people,
                             remaining_abs=abs(budget_info.get('remaining', 0)))
-        
+
     except ValueError as e:
         flash(str(e), "error")
         return redirect(url_for('home'))
     except Exception as e:
-        flash(f"Error generating itinerary: {str(e)}", "error")
+        app.logger.error(f"Error generating itinerary: {str(e)}", exc_info=True)
+        flash("An unexpected error occurred while generating your itinerary", "error")
         return redirect(url_for('home'))
+    
+
 
 # API endpoints for AJAX calls
+# API endpoints for AJAX calls (example)
 @app.route('/api/destination_info', methods=['POST'])
 def api_destination_info():
     try:
@@ -589,15 +612,17 @@ def api_destination_info():
         if not destination:
             return jsonify({'error': 'Destination is required'}), 400
         
-        info = get_destination_info(destination, country)
+        # model = genai.GenerativeModel('gemini-1.5-flash') # Initialize if get_destination_info needs it
+        info = get_destination_info(destination, country) # Pass model if needed
         
-        if "error" in info:
+        if "error" in info: # Assuming get_destination_info returns a dict with an 'error' key on failure
             return jsonify({'error': info['error']}), 500
         return jsonify(info)
 
     except Exception as e:
         print(f"API Error (destination_info): {e}")
         return jsonify({'error': 'Failed to get destination information due to an internal error.'}), 500
+
 
 @app.route('/api/recommendations', methods=['POST'])
 def api_recommendations():
@@ -619,7 +644,7 @@ def api_recommendations():
             return jsonify({'error': 'At least one interest is required'}), 400
         
         app.logger.info(f"Calling recommend_destinations_for_interests with: interests={interests}, continent={continent}, max_results={max_results}")
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash') # Changed model
         
         recs = recommend_destinations_for_interests(
             model, 
@@ -642,7 +667,8 @@ def api_recommendations():
         app.logger.error(f"Unhandled exception in /api/recommendations: {e}", exc_info=True) 
         return jsonify({'error': 'Failed to generate recommendations due to an internal server error.'}), 500
 
-# Utility function for input validation
+
+# Utility function for input validation (as provided by you, slightly modified)
 def validate_trip_input(destination, start_date_str, end_date_str, budget, num_people):
     """Validate all trip input parameters"""
     if not destination or not destination.strip():
@@ -650,6 +676,8 @@ def validate_trip_input(destination, start_date_str, end_date_str, budget, num_p
     if not start_date_str or not end_date_str:
         raise ValueError("Start and end dates are required.")
     
+    # Budget and num_people are likely already validated as float/int before this call,
+    # but good to have checks if called directly.
     if not isinstance(budget, (int, float)) or budget <= 0:
         raise ValueError("Budget must be a positive number.")
     if not isinstance(num_people, int) or num_people <= 0:
@@ -658,14 +686,16 @@ def validate_trip_input(destination, start_date_str, end_date_str, budget, num_p
     try:
         start = datetime.strptime(start_date_str, '%Y-%m-%d')
         end = datetime.strptime(end_date_str, '%Y-%m-%d')
-        if end < start:
+        if end < start: # Allow same day trips, so use < not <=
             raise ValueError("End date must be on or after start date.")
-        if (end - start).days > 365:
+        if (end - start).days > 365: # Example limit
             raise ValueError("Trip duration cannot exceed 365 days.")
     except ValueError as e:
+        # Re-raise with a more user-friendly message if it's a date parsing error
         if "time data" in str(e) or "format" in str(e):
             raise ValueError("Invalid date format. Please use YYYY-MM-DD.")
-        raise e
+        raise e # Re-raise other ValueErrors (like end date before start)
+
 
 if __name__ == '__main__':
     # Initialize database on startup
