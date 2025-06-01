@@ -347,570 +347,294 @@ def generate_traveler_insights(destination: str, country: str = None) -> str:
     except Exception as e:
         return f"\n🚩 Could not generate traveler insights: {str(e)}"
 
-import json
-import traceback
-from typing import Dict, List, Any
-
-def debug_budget_info(budget_info: Dict[str, Any]) -> None:
-    """
-    Debug function to check budget_info structure
-    """
-    print("=" * 50)
-    print("DEBUGGING BUDGET INFO")
-    print("=" * 50)
-    
-    required_keys = ['total_estimated', 'remaining', 'flight_cost', 
-                    'accommodation_cost', 'activity_cost', 'food_cost']
-    
-    print("Budget info contents:")
-    for key, value in budget_info.items():
-        print(f"  {key}: {value} (type: {type(value)})")
-    
-    print("\nMissing keys:")
-    missing_keys = [key for key in required_keys if key not in budget_info]
-    if missing_keys:
-        for key in missing_keys:
-            print(f"  ❌ {key}")
-    else:
-        print("  ✅ All required keys present")
-    
-    print("=" * 50)
-
-def get_destination_info(destination: str, country: str = None) -> Dict[str, Any]:
-    """
-    Enhanced version of get_destination_info with better error handling
-    """
+def generate_traveler_insights(destination: str, country: str = None) -> str:
+    """Generate traveler comments using Gemini"""
     try:
-        print(f"🔍 Getting destination info for: {destination}" + (f", {country}" if country else ""))
-        
-        # Handle continents specially
-        continents = ["europe", "asia", "africa", "north america", "south america", 
-                      "australia", "antarctica", "oceania"]
-        
-        if destination.lower() in continents:
-            print(f"📍 Detected continent: {destination}")
-            # Get continent info first
-            try:
-                continent_info = get_continent_info(destination)
-            except Exception as e:
-                print(f"⚠️ Error getting continent info: {e}")
-                continent_info = {}
-            
-            # Ensure continent_info has required keys with defaults
-            if not isinstance(continent_info, dict):
-                continent_info = {}
-            
-            # Add missing required keys with defaults
-            continent_info.setdefault("flight_cost", 40000)
-            continent_info.setdefault("daily_hotel", 2500)
-            continent_info.setdefault("daily_food", 1500)
-            continent_info.setdefault("daily_activities", 1500)
-            continent_info.setdefault("visa_cost", 0)
-            continent_info.setdefault("visa_type", "Varies by country")
-            continent_info.setdefault("visa_process", "Varies by destination country")
-            continent_info.setdefault("visa_chance", "medium")
-            continent_info.setdefault("name", destination)
-            continent_info.setdefault("country", "Multiple countries")
-            continent_info.setdefault("budget", "medium")
-            continent_info.setdefault("interests", ["sightseeing", "culture"])
-            continent_info.setdefault("best_season", "year-round")
-            
-            # Add images and traveler insights with error handling
-            try:
-                continent_info["images"] = get_destination_images_with_gemini(destination, country, num_images=3)
-                print("✅ Images added successfully")
-            except Exception as e:
-                print(f"⚠️ Error getting images: {e}")
-                continent_info["images"] = []
-                
-            try:
-                continent_info["traveler_insights"] = generate_traveler_insights(destination, country)
-                print("✅ Traveler insights added successfully")
-            except Exception as e:
-                print(f"⚠️ Error getting traveler insights: {e}")
-                continent_info["traveler_insights"] = "No traveler insights available."
-            
-            print("✅ Continent info prepared successfully")
-            return continent_info
-            
-        # Construct prompt with country if provided
-        location = f"{destination}, {country}" if country else destination
-        print(f"🌍 Processing location: {location}")
-        
-        # Use Gemini to get destination information
         prompt = f"""
-        Provide detailed travel information for {location} in JSON format for Indian citizens.
-        Include the following details:
-        - Average flight cost from India in INR
-        - Daily hotel cost (budget, mid-range, luxury) in INR
-        - Daily food cost in INR
-        - Daily activities cost in INR
-        - Visa cost for Indian citizens in INR
-        - Visa type (e.g., Visa on Arrival, eVisa, Visa-Free, etc.)
-        - Visa process description (application method, required documents, processing time)
-        - Visa approval chance (low/medium/high)
-        - Best season to visit
-        - Top interests/attractions
-        - Budget category (low/medium/high)
-        - Country where this destination is located
-        
-        Format your response as valid JSON only, no explanations.
-        Example format:
-        {{
-          "country": "Italy",
-          "flight_cost": 35000,
-          "daily_hotel": {{
-            "budget": 1000,
-            "mid_range": 2500, 
-            "luxury": 6000
-          }},
-          "daily_food": 1200,
-          "daily_activities": 1500,
-          "visa_cost": 3000,
-          "visa_type": "Schengen Visa",
-          "visa_process": "Apply at VFS center with documents including bank statements, itinerary, and hotel bookings 3-4 weeks in advance",
-          "visa_chance": "medium",
-          "best_season": "April-October",
-          "interests": ["beach", "culture", "hiking", "food"],
-          "budget_category": "medium"
-        }}
+        Generate 3-5 authentic traveler reviews for {destination}, {country if country else ''} 
+        from Indian tourists perspective. Include:
+        - Both positive and constructive feedback
+        - Ratings (1-5 stars)
+        - Month of visit
+        - Brief experiences
+        Format as bullet points with emojis.
         """
-        
-        try:
-            # Use the newer recommended model
-            model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-            response = model.generate_content(prompt)
-            print("✅ Gemini API response received")
-            
-            # Clean the response text
-            response_text = response.text.strip()
-            
-            # Remove any markdown formatting if present
-            if response_text.startswith('```json'):
-                response_text = response_text[7:]  # Remove ```json
-            if response_text.endswith('```'):
-                response_text = response_text[:-3]  # Remove closing ```
-            
-            response_text = response_text.strip()
-            
-            print(f"📄 Cleaned response: {response_text[:200]}...")  # Show first 200 chars
-            
-        except Exception as api_error:
-            print(f"❌ Gemini API error: {api_error}")
-            return create_default_destination_info_safe(destination, country)
-        
-        # Process the response
-        try:
-            # Try to parse the JSON response
-            dest_info = json.loads(response_text)
-            print("✅ JSON parsed successfully")
-            
-            # Validate and set flight_cost with proper error handling
-            flight_cost = dest_info.get("flight_cost")
-            if flight_cost is None or not isinstance(flight_cost, (int, float)) or flight_cost <= 0:
-                print(f"⚠️ Invalid flight cost for {destination}: {flight_cost}, using default 40000")
-                flight_cost = 40000
-            else:
-                print(f"✅ Flight cost: ₹{flight_cost}")
-            
-            # Handle the case where daily_hotel might be a dictionary or a single value
-            daily_hotel = 2500  # Default value
-            hotel_data = dest_info.get("daily_hotel")
-            if isinstance(hotel_data, dict):
-                daily_hotel = hotel_data.get("mid_range", 2500)
-                print(f"✅ Hotel cost (mid-range): ₹{daily_hotel}")
-            elif isinstance(hotel_data, (int, float)) and hotel_data > 0:
-                daily_hotel = hotel_data
-                print(f"✅ Hotel cost: ₹{daily_hotel}")
-            else:
-                print(f"⚠️ Invalid hotel cost, using default: ₹{daily_hotel}")
-            
-            # Get country information if available
-            country_info = dest_info.get("country", country if country else "Unknown")
-                
-            # Create a standardized destination info dictionary with all required fields
-            result = {
-                "name": destination,
-                "country": country_info,
-                "budget": dest_info.get("budget_category", "medium"),
-                "interests": dest_info.get("interests", ["sightseeing"]) if isinstance(dest_info.get("interests"), list) else ["sightseeing"],
-                "best_season": dest_info.get("best_season", "year-round"),
-                "flight_cost": int(flight_cost),  # Ensure it's an integer
-                "daily_hotel": int(daily_hotel),  # Ensure it's an integer
-                "daily_food": int(dest_info.get("daily_food", 1500)) if isinstance(dest_info.get("daily_food"), (int, float)) else 1500,
-                "daily_activities": int(dest_info.get("daily_activities", 1500)) if isinstance(dest_info.get("daily_activities"), (int, float)) else 1500,
-                "visa_cost": int(dest_info.get("visa_cost", 0)) if isinstance(dest_info.get("visa_cost"), (int, float)) else 0,
-                "visa_type": str(dest_info.get("visa_type", "Tourist Visa")),
-                "visa_process": str(dest_info.get("visa_process", "Check with embassy for latest requirements")),
-                "visa_chance": str(dest_info.get("visa_chance", "medium"))
-            }
-            
-            print("✅ Result dictionary created with all required fields")
-            
-            # Add images using our new function with error handling
-            try:
-                result["images"] = get_destination_images_with_gemini(destination, country)
-                print("✅ Images added successfully")
-            except Exception as img_error:
-                print(f"⚠️ Error getting images: {img_error}")
-                result["images"] = []
-            
-            # Add traveler insights with error handling
-            try:
-                result["traveler_insights"] = generate_traveler_insights(destination, country)
-                print("✅ Traveler insights added successfully")
-            except Exception as insights_error:
-                print(f"⚠️ Error getting traveler insights: {insights_error}")
-                result["traveler_insights"] = "No traveler insights available."
-            
-            return result
-            
-        except json.JSONDecodeError as json_error:
-            # If JSON parsing fails, use fallback values
-            print(f"❌ JSON parsing error for {location}: {json_error}")
-            print(f"Raw response: {response_text}")
-            return create_default_destination_info_safe(destination, country)
-            
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(prompt)
+        return response.text
     except Exception as e:
-        print(f"❌ Unexpected error in get_destination_info: {str(e)}")
-        print(f"Traceback: {traceback.format_exc()}")
-        return create_default_destination_info_safe(destination, country)
+        print(f"Error generating traveler insights: {str(e)}")
+        return f"\n🚩 Could not generate traveler insights: {str(e)}"
 
-
-def create_default_destination_info_safe(destination: str, country: str = None) -> Dict[str, Any]:
-    """
-    Create a default destination info dictionary with all required fields
-    Enhanced with better error handling
-    """
-    print(f"🔧 Creating default destination info for: {destination}")
-    
-    result = {
-        "name": destination,
-        "country": country if country else "Unknown",
-        "budget": "medium",
-        "interests": ["sightseeing", "culture", "food"],
-        "best_season": "year-round",
-        "flight_cost": 40000,
-        "daily_hotel": 2500,
-        "daily_food": 1500,
-        "daily_activities": 1500,
-        "visa_cost": 3000,
-        "visa_type": "Tourist Visa",
-        "visa_process": "Check with embassy for latest requirements",
-        "visa_chance": "medium"
-    }
-    
-    # Try to add images even if other parts failed
-    try:
-        result["images"] = get_destination_images_with_gemini(destination, country)
-        print("✅ Default images added successfully")
-    except Exception as e:
-        print(f"⚠️ Error adding default images: {e}")
-        result["images"] = []
-        
-    # Try to add traveler insights even if other parts failed
-    try:
-        result["traveler_insights"] = generate_traveler_insights(destination, country)
-        print("✅ Default traveler insights added successfully")
-    except Exception as e:
-        print(f"⚠️ Error adding default traveler insights: {e}")
-        result["traveler_insights"] = "No traveler insights available."
-    
-    print("✅ Default destination info created successfully")    
-    return result
-
-
-def calculate_budget_safe(dest_info: Dict[str, Any], num_people: int, num_days: int) -> Dict[str, Any]:
-    """
-    Safely calculate budget information from destination info
-    """
-    try:
-        print(f"💰 Calculating budget for {num_people} people, {num_days} days")
-        
-        # Safely extract costs with defaults
-        flight_cost = dest_info.get('flight_cost', 40000)
-        daily_hotel = dest_info.get('daily_hotel', 2500)
-        daily_food = dest_info.get('daily_food', 1500)
-        daily_activities = dest_info.get('daily_activities', 1500)
-        visa_cost = dest_info.get('visa_cost', 3000)
-        
-        print(f"  Flight cost per person: ₹{flight_cost}")
-        print(f"  Daily hotel cost: ₹{daily_hotel}")
-        print(f"  Daily food cost per person: ₹{daily_food}")
-        print(f"  Daily activities cost per person: ₹{daily_activities}")
-        print(f"  Visa cost per person: ₹{visa_cost}")
-        
-        # Calculate total costs
-        total_flight_cost = flight_cost * num_people
-        total_accommodation_cost = daily_hotel * num_days
-        total_food_cost = daily_food * num_people * num_days
-        total_activity_cost = daily_activities * num_people * num_days
-        total_visa_cost = visa_cost * num_people
-        
-        total_estimated = (total_flight_cost + total_accommodation_cost + 
-                          total_food_cost + total_activity_cost + total_visa_cost)
-        
-        budget_info = {
-            'flight_cost': total_flight_cost,
-            'accommodation_cost': total_accommodation_cost,
-            'food_cost': total_food_cost,
-            'activity_cost': total_activity_cost,
-            'visa_cost': total_visa_cost,
-            'total_estimated': total_estimated,
-            'remaining': 0  # This would be set based on user's budget
-        }
-        
-        print(f"💰 Budget calculated successfully:")
-        print(f"  Total flight: ₹{total_flight_cost:,}")
-        print(f"  Total accommodation: ₹{total_accommodation_cost:,}")
-        print(f"  Total food: ₹{total_food_cost:,}")
-        print(f"  Total activities: ₹{total_activity_cost:,}")
-        print(f"  Total visa: ₹{total_visa_cost:,}")
-        print(f"  Grand total: ₹{total_estimated:,}")
-        
-        return budget_info
-        
-    except Exception as e:
-        print(f"❌ Error calculating budget: {e}")
-        print(f"Traceback: {traceback.format_exc()}")
-        
-        # Return safe defaults
-        return {
-            'flight_cost': 40000 * num_people,
-            'accommodation_cost': 2500 * num_days,
-            'food_cost': 1500 * num_people * num_days,
-            'activity_cost': 1500 * num_people * num_days,
-            'visa_cost': 3000 * num_people,
-            'total_estimated': (40000 + 2500 + 1500 + 1500 + 3000) * num_people * num_days,
-            'remaining': 0
-        }
-
-
-def test_itinerary_generation():
-    """
-    Test function to debug the entire itinerary generation process
-    """
-    print("🧪 TESTING ITINERARY GENERATION")
-    print("=" * 60)
-    
-    # Test data
-    destination = "Paris"
-    country = "France"
-    start_date = "15 March 2025"
-    end_date = "20 March 2025"
-    interests = ["culture", "food", "museums"]
-    num_people = 2
-    
-    try:
-        # Step 1: Get destination info
-        print("Step 1: Getting destination info...")
-        dest_info = get_destination_info_safe(destination, country)
-        print(f"✅ Destination info keys: {list(dest_info.keys())}")
-        
-        # Step 2: Calculate budget
-        print("\nStep 2: Calculating budget...")
-        num_days = 6  # From March 15 to 20
-        budget_info = calculate_budget_safe(dest_info, num_people, num_days)
-        debug_budget_info(budget_info)
-        
-        # Step 3: Generate itinerary
-        print("\nStep 3: Generating itinerary...")
-        # Here you would call your generate_itinerary function
-        # itinerary = generate_itinerary(destination, start_date, end_date, interests, num_people, budget_info, country)
-        
-        print("✅ Test completed successfully!")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
-        print(f"Traceback: {traceback.format_exc()}")
-        return False
-
-# Helper function to validate all required functions exist
-def check_dependencies():
-    """
-    Check if all required functions are available
-    """
-    required_functions = [
-        'get_continent_info',
-        'get_destination_images_with_gemini', 
-        'generate_traveler_insights',
-        'genai'
-    ]
-    
-    print("🔍 Checking dependencies...")
-    for func_name in required_functions:
-        try:
-            if func_name == 'genai':
-                import google.generativeai as genai
-                print(f"✅ {func_name} module available")
-            else:
-                # Try to get the function from globals
-                if func_name in globals():
-                    print(f"✅ {func_name} function available")
-                else:
-                    print(f"⚠️ {func_name} function not found")
-        except ImportError:
-            print(f"❌ {func_name} not available")
-
+FALLBACK_DATA_FOR_DESTINATIONS = {
+    "country": "Unknown",
+    "budget": "medium",
+    "interests": ["travel", "sightseeing", "culture"],
+    "best_season": "year-round",
+    "flight_cost": 0,  # Default flight cost
+    "daily_hotel": 3500,
+    "daily_food": 2000,
+    "daily_activities": 2000,
+    "visa_cost": 5000,
+    "visa_type": "Varies by country",
+    "visa_process": "Check with specific country embassies",
+    "visa_chance": "medium",
+    "images": [],
+    "traveler_insights": "No traveler insights available."
+}
 
 def get_continent_info(continent: str) -> dict:
     """
-    Get predefined information for continental destinations
-    
-    Args:
-        continent: Name of the continent
-    
-    Returns:
-        Dictionary with continent-specific travel details
+    Get predefined information for continental destinations.
+    This function is assumed to be correct and include 'flight_cost'.
     """
-    # Dictionary of continent-specific information
     continent_data = {
         "europe": {
-            "name": "Europe",
-            "country": "Multiple Countries",
-            "budget": "high",
+            "name": "Europe", "country": "Multiple Countries", "budget": "high",
             "interests": ["culture", "history", "architecture", "cuisine", "art"],
-            "best_season": "April-October",
-            "flight_cost": 50000,
-            "daily_hotel": 4000,
-            "daily_food": 2000,
-            "daily_activities": 2500,
-            "visa_cost": 6000,
+            "best_season": "April-October", "flight_cost": 50000, "daily_hotel": 4000,
+            "daily_food": 2000, "daily_activities": 2500, "visa_cost": 6000,
             "visa_type": "Schengen Visa (for most countries)",
             "visa_process": "Apply at VFS center with documents including bank statements, itinerary, and hotel bookings 3-4 weeks in advance",
             "visa_chance": "medium"
         },
         "asia": {
-            "name": "Asia",
-            "country": "Multiple Countries",
-            "budget": "medium",
+            "name": "Asia", "country": "Multiple Countries", "budget": "medium",
             "interests": ["culture", "food", "temples", "beaches", "shopping"],
-            "best_season": "November-February",
-            "flight_cost": 30000,
-            "daily_hotel": 2000,
-            "daily_food": 1200,
-            "daily_activities": 1500,
-            "visa_cost": 3000,
+            "best_season": "November-February", "flight_cost": 30000, "daily_hotel": 2000,
+            "daily_food": 1200, "daily_activities": 1500, "visa_cost": 3000,
             "visa_type": "Varies by country",
             "visa_process": "Varies by country, many offer visa on arrival or e-visa for Indian citizens",
             "visa_chance": "high"
         },
         "north america": {
-            "name": "North America",
-            "country": "Multiple Countries",
-            "budget": "high",
+            "name": "North America", "country": "Multiple Countries", "budget": "high",
             "interests": ["nature", "cities", "theme parks", "shopping", "national parks"],
-            "best_season": "May-September",
-            "flight_cost": 80000,
-            "daily_hotel": 6000,
-            "daily_food": 2500,
-            "daily_activities": 3000,
-            "visa_cost": 12000,
+            "best_season": "May-September", "flight_cost": 80000, "daily_hotel": 6000,
+            "daily_food": 2500, "daily_activities": 3000, "visa_cost": 12000,
             "visa_type": "Tourist Visa (B1/B2 for USA, eTA for Canada)",
             "visa_process": "Complex process requiring documentation of ties to India, financial capability, and interview",
             "visa_chance": "medium"
         },
         "south america": {
-            "name": "South America",
-            "country": "Multiple Countries",
-            "budget": "medium",
+            "name": "South America", "country": "Multiple Countries", "budget": "medium",
             "interests": ["nature", "culture", "adventure", "beaches", "hiking"],
-            "best_season": "June-August",
-            "flight_cost": 90000,
-            "daily_hotel": 3000,
-            "daily_food": 1800,
-            "daily_activities": 2000,
-            "visa_cost": 5000,
+            "best_season": "June-August", "flight_cost": 90000, "daily_hotel": 3000,
+            "daily_food": 1800, "daily_activities": 2000, "visa_cost": 5000,
             "visa_type": "Varies by country",
             "visa_process": "Varies by country, some offer visa-free entry for Indian citizens",
             "visa_chance": "medium"
         },
         "africa": {
-            "name": "Africa",
-            "country": "Multiple Countries",
-            "budget": "medium",
+            "name": "Africa", "country": "Multiple Countries", "budget": "medium",
             "interests": ["safari", "wildlife", "culture", "adventure", "beaches"],
-            "best_season": "June-October",
-            "flight_cost": 60000,
-            "daily_hotel": 3500,
-            "daily_food": 1500,
-            "daily_activities": 3000,
-            "visa_cost": 4000,
+            "best_season": "June-October", "flight_cost": 60000, "daily_hotel": 3500,
+            "daily_food": 1500, "daily_activities": 3000, "visa_cost": 4000,
             "visa_type": "Varies by country",
             "visa_process": "Varies by country, some offer e-visa",
             "visa_chance": "medium"
         },
         "australia": {
-            "name": "Australia",
-            "country": "Australia",
-            "budget": "high",
+            "name": "Australia", "country": "Australia", "budget": "high",
             "interests": ["beaches", "wildlife", "cities", "outback", "marine life"],
-            "best_season": "December-February",
-            "flight_cost": 70000,
-            "daily_hotel": 5000,
-            "daily_food": 2500,
-            "daily_activities": 3000,
-            "visa_cost": 15000,
+            "best_season": "December-February", "flight_cost": 70000, "daily_hotel": 5000,
+            "daily_food": 2500, "daily_activities": 3000, "visa_cost": 15000,
             "visa_type": "Tourist Visa (Subclass 600)",
             "visa_process": "Online application with financial documentation",
             "visa_chance": "high"
         },
         "oceania": {
-            "name": "Oceania",
-            "country": "Multiple Countries",
-            "budget": "high",
+            "name": "Oceania", "country": "Multiple Countries", "budget": "high",
             "interests": ["islands", "beaches", "culture", "water activities", "nature"],
-            "best_season": "May-October",
-            "flight_cost": 75000,
-            "daily_hotel": 4500,
-            "daily_food": 2300,
-            "daily_activities": 2800,
-            "visa_cost": 10000,
+            "best_season": "May-October", "flight_cost": 75000, "daily_hotel": 4500,
+            "daily_food": 2300, "daily_activities": 2800, "visa_cost": 10000,
             "visa_type": "Varies by country",
             "visa_process": "Varies by country, some offer visa on arrival",
             "visa_chance": "medium"
         },
         "antarctica": {
-            "name": "Antarctica",
-            "country": "No country (governed by Antarctic Treaty)",
+            "name": "Antarctica", "country": "No country (governed by Antarctic Treaty)",
             "budget": "very high",
             "interests": ["wildlife", "landscapes", "expedition", "photography", "adventure"],
-            "best_season": "November-March",
-            "flight_cost": 200000,
-            "daily_hotel": 25000,
-            "daily_food": 5000,
-            "daily_activities": 10000,
-            "visa_cost": 0,
+            "best_season": "November-March", "flight_cost": 200000, "daily_hotel": 25000,
+            "daily_food": 5000, "daily_activities": 10000, "visa_cost": 0,
             "visa_type": "No visa required, but permits needed",
             "visa_process": "Tour operator handles permits, no direct visa needed",
             "visa_chance": "high"
         }
     }
-    
-    # Normalize continent name and get data
     continent_key = continent.lower()
-    
-    # Return the continent data if found, otherwise return default data
     if continent_key in continent_data:
         return continent_data[continent_key]
     else:
-        print(f"Unknown continent: {continent}. Using default values.")
+        print(f"Unknown continent: {continent}. Using default values for continent.")
+        # Fallback for unknown continents, ensuring all keys including flight_cost are present
         return {
             "name": continent,
             "country": "Multiple Countries",
-            "budget": "medium",
-            "interests": ["travel", "sightseeing", "culture"],
-            "best_season": "year-round",
-            "flight_cost": 60000,
-            "daily_hotel": 3500,
-            "daily_food": 2000,
-            "daily_activities": 2000,
-            "visa_cost": 5000,
-            "visa_type": "Varies by country",
-            "visa_process": "Check with specific country embassies",
-            "visa_chance": "medium"
+            "budget": FALLBACK_DATA_FOR_DESTINATIONS["budget"],
+            "interests": list(FALLBACK_DATA_FOR_DESTINATIONS["interests"]),
+            "best_season": FALLBACK_DATA_FOR_DESTINATIONS["best_season"],
+            "flight_cost": FALLBACK_DATA_FOR_DESTINATIONS["flight_cost"],
+            "daily_hotel": FALLBACK_DATA_FOR_DESTINATIONS["daily_hotel"],
+            "daily_food": FALLBACK_DATA_FOR_DESTINATIONS["daily_food"],
+            "daily_activities": FALLBACK_DATA_FOR_DESTINATIONS["daily_activities"],
+            "visa_cost": FALLBACK_DATA_FOR_DESTINATIONS["visa_cost"],
+            "visa_type": FALLBACK_DATA_FOR_DESTINATIONS["visa_type"],
+            "visa_process": FALLBACK_DATA_FOR_DESTINATIONS["visa_process"],
+            "visa_chance": FALLBACK_DATA_FOR_DESTINATIONS["visa_chance"]
         }
+
+def get_destination_info(destination: str, country: str = None) -> dict:
+    """
+    Get detailed information about any global destination, including images and traveler insights.
+    Ensures 'flight_cost' and other essential keys are always present in the returned dictionary.
+    """
+    continents = ["europe", "asia", "africa", "north america", "south america",
+                  "australia", "antarctica", "oceania"]
+    destination_lower = destination.lower()
+
+    # Handle continents separately as they have predefined data
+    if destination_lower in continents:
+        continent_info = get_continent_info(destination)
+        try:
+            # For continents, country is not applicable for these generic image/insight functions
+            # Ensure the external functions are called correctly based on their definitions
+            continent_info["images"] = get_destination_images_with_gemini(destination, num_images=3)
+        except Exception as img_e:
+            print(f"Error adding images for continent {destination}: {img_e}")
+            continent_info["images"] = list(FALLBACK_DATA_FOR_DESTINATIONS["images"]) # Use a copy
+        try:
+            continent_info["traveler_insights"] = generate_traveler_insights(destination)
+        except Exception as insight_e:
+            print(f"Error adding traveler insights for continent {destination}: {insight_e}")
+            continent_info["traveler_insights"] = FALLBACK_DATA_FOR_DESTINATIONS["traveler_insights"]
+        return continent_info
+
+    # For non-continent destinations
+    location_query = f"{destination}, {country}" if country else destination
+    result = {}  # Initialize result
+
+    try:
+        prompt = f"""
+        Provide detailed travel information for {location_query} in JSON format for Indian citizens.
+        Include the following details:
+        - country: Name of the country where the destination is located (string)
+        - flight_cost: Average flight cost from India in INR (integer)
+        - daily_hotel: {{ "budget": int, "mid_range": int, "luxury": int }} (object with integer values in INR)
+        - daily_food: Average daily food cost in INR (integer)
+        - daily_activities: Average daily activities cost in INR (integer)
+        - visa_cost: Visa cost for Indian citizens in INR (integer)
+        - visa_type: Visa type (e.g., "Visa on Arrival", "eVisa", "Visa-Free") (string)
+        - visa_process: Visa process description (string)
+        - visa_chance: Visa approval chance ("low", "medium", "high") (string)
+        - best_season: Best season to visit (string)
+        - interests: Top interests/attractions (list of strings)
+        - budget_category: Overall budget category ("low", "medium", "high") (string)
+
+        Format your response as valid JSON only, with no explanations or surrounding text.
+        Example:
+        {{
+          "country": "France",
+          "flight_cost": 45000,
+          "daily_hotel": {{ "budget": 3000, "mid_range": 7000, "luxury": 15000 }},
+          "daily_food": 2500,
+          "daily_activities": 3000,
+          "visa_cost": 7000,
+          "visa_type": "Schengen Visa",
+          "visa_process": "Apply via VFS with required documents like bank statements, itinerary, bookings. Processing time: 3-4 weeks.",
+          "visa_chance": "medium",
+          "best_season": "April to June, September to October",
+          "interests": ["Eiffel Tower", "Louvre Museum", "cuisine", "fashion"],
+          "budget_category": "high"
+        }}
+        """
+        # Assuming genai is imported and configured (e.g., import google.generativeai as genai)
+        # Use the model name from your original code or update if necessary
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash", # Or "gemini-2.0-flash" as per latest guidelines
+            generation_config=genai.types.GenerationConfig(
+                response_mime_type="application/json"
+            )
+        )
+        response = model.generate_content(prompt)
+        dest_info = json.loads(response.text)
+
+        # Safely extract daily_hotel (mid-range preferred)
+        daily_hotel_val = FALLBACK_DATA_FOR_DESTINATIONS["daily_hotel"]  # Default
+        daily_hotel_obj = dest_info.get("daily_hotel")
+        if isinstance(daily_hotel_obj, dict):
+            if isinstance(daily_hotel_obj.get("mid_range"), (int, float)):
+                daily_hotel_val = daily_hotel_obj["mid_range"]
+            elif isinstance(daily_hotel_obj.get("budget"), (int, float)):
+                daily_hotel_val = daily_hotel_obj["budget"]
+            elif isinstance(daily_hotel_obj.get("luxury"), (int, float)):
+                daily_hotel_val = daily_hotel_obj["luxury"]
+        elif isinstance(daily_hotel_obj, (int, float)): # if API returns a single number for hotel
+            daily_hotel_val = daily_hotel_obj
+
+        result = {
+            "name": destination,
+            "country": dest_info.get("country", country if country else FALLBACK_DATA_FOR_DESTINATIONS["country"]),
+            "budget": dest_info.get("budget_category", FALLBACK_DATA_FOR_DESTINATIONS["budget"]),
+            "interests": dest_info.get("interests", list(FALLBACK_DATA_FOR_DESTINATIONS["interests"])),
+            "best_season": dest_info.get("best_season", FALLBACK_DATA_FOR_DESTINATIONS["best_season"]),
+            "flight_cost": dest_info.get("flight_cost", FALLBACK_DATA_FOR_DESTINATIONS["flight_cost"]),
+            "daily_hotel": daily_hotel_val,
+            "daily_food": dest_info.get("daily_food", FALLBACK_DATA_FOR_DESTINATIONS["daily_food"]),
+            "daily_activities": dest_info.get("daily_activities", FALLBACK_DATA_FOR_DESTINATIONS["daily_activities"]),
+            "visa_cost": dest_info.get("visa_cost", FALLBACK_DATA_FOR_DESTINATIONS["visa_cost"]),
+            "visa_type": dest_info.get("visa_type", FALLBACK_DATA_FOR_DESTINATIONS["visa_type"]),
+            "visa_process": dest_info.get("visa_process", FALLBACK_DATA_FOR_DESTINATIONS["visa_process"]),
+            "visa_chance": dest_info.get("visa_chance", FALLBACK_DATA_FOR_DESTINATIONS["visa_chance"])
+        }
+
+    except (json.JSONDecodeError, AttributeError, Exception) as e:
+        print(f"Error processing LLM data for {location_query} (Error: {type(e).__name__} - {str(e)}). Using fallback data.")
+        result = {
+            "name": destination,
+            "country": country if country else FALLBACK_DATA_FOR_DESTINATIONS["country"],
+            "budget": FALLBACK_DATA_FOR_DESTINATIONS["budget"],
+            "interests": list(FALLBACK_DATA_FOR_DESTINATIONS["interests"]), # Use a copy
+            "best_season": FALLBACK_DATA_FOR_DESTINATIONS["best_season"],
+            "flight_cost": FALLBACK_DATA_FOR_DESTINATIONS["flight_cost"], # Ensure flight_cost is present
+            "daily_hotel": FALLBACK_DATA_FOR_DESTINATIONS["daily_hotel"],
+            "daily_food": FALLBACK_DATA_FOR_DESTINATIONS["daily_food"],
+            "daily_activities": FALLBACK_DATA_FOR_DESTINATIONS["daily_activities"],
+            "visa_cost": FALLBACK_DATA_FOR_DESTINATIONS["visa_cost"],
+            "visa_type": FALLBACK_DATA_FOR_DESTINATIONS["visa_type"],
+            "visa_process": FALLBACK_DATA_FOR_DESTINATIONS["visa_process"],
+            "visa_chance": FALLBACK_DATA_FOR_DESTINATIONS["visa_chance"]
+        }
+
+    # Add images and insights, using data from `result`
+    try:
+        country_for_img_insight = result.get("country", FALLBACK_DATA_FOR_DESTINATIONS["country"])
+        # Call image/insight functions appropriately based on whether country is specific
+        if country_for_img_insight in ["Unknown", "Multiple Countries", FALLBACK_DATA_FOR_DESTINATIONS["country"]]:
+            result["images"] = get_destination_images_with_gemini(destination, num_images=3)
+            result["traveler_insights"] = generate_traveler_insights(destination)
+        else:
+            result["images"] = get_destination_images_with_gemini(destination, country_for_img_insight, num_images=3)
+            result["traveler_insights"] = generate_traveler_insights(destination, country_for_img_insight)
+    except Exception as img_insight_e:
+        print(f"Error adding images or insights for {destination}: {img_insight_e}")
+        result["images"] = result.get("images", list(FALLBACK_DATA_FOR_DESTINATIONS["images"]))
+        result["traveler_insights"] = result.get("traveler_insights", FALLBACK_DATA_FOR_DESTINATIONS["traveler_insights"])
+
+    # Final check to ensure all fallback keys are present and flight_cost is numeric
+    for key, default_val in FALLBACK_DATA_FOR_DESTINATIONS.items():
+        if key not in result:
+            result[key] = list(default_val) if isinstance(default_val, list) else default_val
+    
+    if not isinstance(result.get("flight_cost"), (int, float)):
+        print(f"Warning: flight_cost for {destination} was not numeric, defaulting.")
+        result["flight_cost"] = int(FALLBACK_DATA_FOR_DESTINATIONS["flight_cost"])
+    if not isinstance(result.get("interests"), list):
+        result["interests"] = list(FALLBACK_DATA_FOR_DESTINATIONS["interests"])
+
+
+    return result
 
 import json
 import re
@@ -1112,29 +836,30 @@ def test_recommendations():
 
 
 def calculate_budget_breakdown(destination_info: Dict[str, Any], total_budget: float, num_days: int, num_people: int) -> Dict[str, Any]:
-    """
-    Calculate detailed budget breakdown for any destination
+    """Calculate budget breakdown with safe defaults."""
+    # Default costs (in INR)
+    DEFAULTS = {
+        'flight_cost': 0,          # Free for local destinations
+        'daily_hotel': 1500,       # ₹1500/night
+        'daily_food': 500,         # ₹500/day
+        'daily_activities': 800,   # ₹800/day
+        'visa_cost': 0             # No visa needed
+    }
     
-    Args:
-        destination_info: Dictionary with destination details
-        total_budget: Total budget in INR
-        num_days: Number of days for the trip
-        num_people: Number of travelers
-        
-    Returns:
-        Dictionary with budget breakdown
-    """
-    # Calculate costs
-    flight_cost = destination_info["flight_cost"] * num_people
-    accommodation = destination_info["daily_hotel"] * num_days * num_people
-    meals = destination_info["daily_food"] * num_days * num_people
-    activities = destination_info["daily_activities"] * num_days * num_people
-    visa = destination_info["visa_cost"] * num_people
+    # Get costs with defaults
+    costs = {key: destination_info.get(key, default) 
+             for key, default in DEFAULTS.items()}
+    
+    # Calculate breakdown
+    flight_cost = costs['flight_cost'] * num_people
+    accommodation = costs['daily_hotel'] * num_days * num_people
+    meals = costs['daily_food'] * num_days * num_people
+    activities = costs['daily_activities'] * num_days * num_people
+    visa = costs['visa_cost'] * num_people
     local_transport = 500 * num_days * num_people
     miscellaneous = 500 * num_days * num_people
     
     total_estimated = flight_cost + accommodation + meals + activities + visa + local_transport + miscellaneous
-    remaining = total_budget - total_estimated
     
     return {
         "flight_cost": flight_cost,
@@ -1145,107 +870,65 @@ def calculate_budget_breakdown(destination_info: Dict[str, Any], total_budget: f
         "local_transport": local_transport,
         "miscellaneous": miscellaneous,
         "total_estimated": total_estimated,
-        "remaining": remaining,
+        "remaining": total_budget - total_estimated,
         "per_person": total_estimated / num_people,
         "per_person_per_day": total_estimated / (num_people * num_days)
     }
 
-
-def generate_itinerary(destination: str, start_date: str, end_date: str, 
-                      interests: List[str], num_people: int, 
-                      budget_info: Dict[str, Any], country: str = None) -> str:
-    """Enhanced with visual elements and improved formatting - with better error handling"""
+def generate_itinerary(destination: str, 
+                      start_date: Union[str, datetime], 
+                      end_date: Union[str, datetime],
+                      interests: List[str], 
+                      num_people: int, 
+                      budget_info: Dict[str, Any], 
+                      country: str = None) -> str:
+    """Enhanced with visual elements and improved formatting"""
     try:
-        num_days = (datetime.strptime(end_date, "%d %B %Y") - datetime.strptime(start_date, "%d %B %Y")).days + 1
+        if isinstance(start_date, str):
+            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+        if isinstance(end_date, str):
+            end_date = datetime.strptime(end_date, '%Y-%m-%d')
         
-        # Get destination info with error handling
-        try:
-            dest_info = get_destination_info(destination, country)
-        except Exception as e:
-            print(f"Warning: Could not fetch destination info: {e}")
-            dest_info = {
-                'visa_type': 'Check with embassy/consulate',
-                'visa_cost': 'Varies',
-                'visa_process': 'Contact embassy for details',
-                'visa_chance': 'Varies by case',
-                'images': [],
-                'traveler_insights': None
-            }
-        
+        num_days = (end_date - start_date).days + 1
+        flight_cost = budget_info.get('flight_cost', 0)
+        # Get destination info again for visa details
+        dest_info = get_destination_info(destination, country)
+        start_date_str = start_date.strftime('%d %B %Y')
+        end_date_str = end_date.strftime('%d %B %Y')
         # Construct location string with country if provided
         location = f"{destination}, {country}" if country else destination
         
-        # Ensure budget_info has all required keys with defaults
-        budget_defaults = {
-            'total_estimated': 0,
-            'remaining': 0,
-            'flight_cost': 0,  # Add this if it's missing
-            'accommodation_cost': 0,
-            'activity_cost': 0,
-            'food_cost': 0
-        }
-        
-        # Merge defaults with provided budget_info
-        for key, default_value in budget_defaults.items():
-            if key not in budget_info:
-                budget_info[key] = default_value
-                print(f"Warning: '{key}' not found in budget_info, using default value: {default_value}")
-        
         # Format budget status message with visual indicators
-        remaining = budget_info.get('remaining', 0)
-        total_estimated = budget_info.get('total_estimated', 0)
-        
-        if remaining >= 0:
-            budget_status = f"Within budget (remaining: ₹{remaining:,.2f})"
+        if budget_info['remaining'] >= 0:
+            budget_status = f"✅ Within budget (remaining: ₹{budget_info['remaining']:,.2f})"
             budget_emoji = "💰"
-            budget_indicator = "✅"
         else:
-            budget_status = f"Over budget by ₹{abs(remaining):,.2f}"
+            budget_status = f"⚠️ Over budget by ₹{abs(budget_info['remaining']):,.2f}"
             budget_emoji = "💸"
-            budget_indicator = "⚠️"
         
         # Create a visually appealing header
         header = f"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                           🌍 TRAVEL ITINERARY 2025 🌍                        ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
-║  📍 Destination: {location:<56} ║
-║  📅 Duration: {start_date} to {end_date} ({num_days} days)         ║
+║  📍 Destination: {location:<30}                                      ║
+║  📅 Duration: {start_date} to {end_date} ({num_days} days)                    ║
 ║  👥 Travelers: {num_people} people                                            ║
-║  {budget_emoji} Budget: ₹{total_estimated:,.2f}                              ║
-║  {budget_indicator} Status: {budget_status:<52} ║
-║  🎯 Interests: {', '.join(interests):<52} ║
+║  {budget_emoji} Budget: ₹{budget_info['total_estimated']:,.2f} - {budget_status}     ║
+║  🎯 Interests: {', '.join(interests)}                                         ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
-        """
-        
-        # Enhanced budget breakdown section
-        budget_breakdown = f"""
-╭─────────────────────────────────────────────────────────────╮
-│                     💰 BUDGET BREAKDOWN                     │
-╰─────────────────────────────────────────────────────────────╯
-
-┌─────────────────────────────────────────────────────────────┐
-│ CATEGORY           │ ESTIMATED COST      │ PER PERSON      │
-├─────────────────────────────────────────────────────────────┤
-│ ✈️  Flights         │ ₹{budget_info.get('flight_cost', 0):>8,.2f}       │ ₹{budget_info.get('flight_cost', 0)/num_people:>6,.2f}     │
-│ 🏨 Accommodation   │ ₹{budget_info.get('accommodation_cost', 0):>8,.2f}       │ ₹{budget_info.get('accommodation_cost', 0)/num_people:>6,.2f}     │
-│ 🍽️  Food & Dining  │ ₹{budget_info.get('food_cost', 0):>8,.2f}       │ ₹{budget_info.get('food_cost', 0)/num_people:>6,.2f}     │
-│ 🎫 Activities      │ ₹{budget_info.get('activity_cost', 0):>8,.2f}       │ ₹{budget_info.get('activity_cost', 0)/num_people:>6,.2f}     │
-├─────────────────────────────────────────────────────────────┤
-│ 💵 TOTAL           │ ₹{total_estimated:>8,.2f}       │ ₹{total_estimated/num_people:>6,.2f}     │
-└─────────────────────────────────────────────────────────────┘
         """
         
         prompt = f"""
         Create a beautifully formatted {num_days}-day travel itinerary for {location} for {num_people} people focusing on {', '.join(interests)}.
         Travel dates: {start_date} to {end_date}.
-        Total budget: ₹{total_estimated:,.2f} ({budget_status}).
+        Total budget: ₹{budget_info['total_estimated']:,.2f} ({budget_status}).
         
-        {'' if remaining >= 0 else 'Please suggest ways to reduce costs while maintaining a good experience.'}
+        {'' if budget_info['remaining'] >= 0 else 'Please suggest ways to reduce costs while maintaining a good experience.'}
         
         Format the itinerary with the following enhanced sections:
         
-        {'' if remaining >= 0 else '''
+        {'' if budget_info['remaining'] >= 0 else '''
         ╭─────────────────────────────────────────────────────────────╮
         │                   💡 BUDGET OPTIMIZATION                    │
         ╰─────────────────────────────────────────────────────────────╯
@@ -1265,10 +948,10 @@ def generate_itinerary(destination: str, start_date: str, end_date: str,
         
         📋 VISA DETAILS (for Indian Citizens):
         ┌─────────────────────────────────────────────────────────────┐
-        │ Visa Type      │ {dest_info.get('visa_type', 'Check embassy')}           │
-        │ Cost           │ ₹{dest_info.get('visa_cost', 'Varies')}                 │
-        │ Process        │ {dest_info.get('visa_process', 'Contact embassy')}      │
-        │ Success Rate   │ {dest_info.get('visa_chance', 'Varies')}                │
+        │ Visa Type      │ {dest_info['visa_type']}                    │
+        │ Cost           │ ₹{dest_info['visa_cost']}                   │
+        │ Process        │ {dest_info['visa_process']}                 │
+        │ Success Rate   │ {dest_info['visa_chance']}                  │
         └─────────────────────────────────────────────────────────────┘
         
         ✅ REQUIRED DOCUMENTS:
@@ -1280,8 +963,8 @@ def generate_itinerary(destination: str, start_date: str, end_date: str,
         • Bank statements (last 3 months)
         • Employment letter/NOC
         
-        ⏰ PROCESSING TIME: [Specify timeline based on destination]
-        💡 SUCCESS TIPS: [Application tips based on destination]
+        ⏰ PROCESSING TIME: [Specify timeline]
+        💡 SUCCESS TIPS: [Application tips]
         
         ╭─────────────────────────────────────────────────────────────╮
         │                   📅 DAILY ITINERARY                       │
@@ -1407,25 +1090,11 @@ def generate_itinerary(destination: str, start_date: str, end_date: str,
         Make each section visually distinct and easy to scan.
         """
         
-        # Generate content with error handling
-        try:
-            response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt)
-            itinerary = response.text
-        except Exception as e:
-            print(f"Error generating AI content: {e}")
-            itinerary = """
-╭─────────────────────────────────────────────────────────────╮
-│                    ⚠️ AI SERVICE UNAVAILABLE                │
-╰─────────────────────────────────────────────────────────────╯
-
-A basic itinerary framework has been provided below.
-Please customize it based on your specific destination and preferences.
-
-[Basic itinerary template would go here]
-            """
+        response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt)
+        itinerary = response.text
         
-        # Combine header, budget breakdown, and itinerary
-        final_itinerary = header + budget_breakdown + itinerary
+        # Add the header to the beginning
+        final_itinerary = header + itinerary
         
         # Add enhanced image and traveler insights sections
         final_itinerary += """
@@ -1438,9 +1107,8 @@ Please customize it based on your specific destination and preferences.
 """
         
         # Make sure the images key exists and has data
-        images = dest_info.get('images', [])
-        if images and len(images) > 0:
-            for i, img in enumerate(images[:3], 1):
+        if dest_info.get('images') and len(dest_info['images']) > 0:
+            for i, img in enumerate(dest_info['images'][:3], 1):
                 final_itinerary += f"""
 ┌─ PHOTO SPOT {i} ─────────────────────────────────────────────┐
 │ 📷 {img.get('description', 'Scenic view'):<50} │
@@ -1449,7 +1117,7 @@ Please customize it based on your specific destination and preferences.
 │ 💡 Photo tip: [Composition/lighting advice]                │"""
                 if 'credit' in img:
                     final_itinerary += f"""
-│ 📸 Credit: {img['credit']:<42} │"""
+│ 📸 Credit: {img['credit']}                                  │"""
                 final_itinerary += """
 └─────────────────────────────────────────────────────────────┘
 """
@@ -1471,10 +1139,9 @@ Please customize it based on your specific destination and preferences.
 💬 INSIDER TIPS FROM FELLOW TRAVELERS:
 """
         
-        traveler_insights = dest_info.get('traveler_insights')
-        if traveler_insights:
+        if dest_info.get('traveler_insights'):
             # Format the insights in a box
-            insights_lines = traveler_insights.split('\n')
+            insights_lines = dest_info['traveler_insights'].split('\n')
             for line in insights_lines:
                 if line.strip():
                     final_itinerary += f"   • {line.strip()}\n"
@@ -1500,26 +1167,6 @@ Please customize it based on your specific destination and preferences.
         
         return final_itinerary
         
-    except KeyError as e:
-        error_message = f"""
-╔══════════════════════════════════════════════════════════════╗
-║                    ⚠️ MISSING DATA ERROR ⚠️                  ║
-╠══════════════════════════════════════════════════════════════╣
-║                                                              ║
-║  Missing required data: {str(e):<41} ║
-║                                                              ║
-║  💡 Please ensure your budget_info dictionary includes:      ║
-║  • total_estimated                                           ║
-║  • remaining                                                 ║
-║  • flight_cost                                               ║
-║  • accommodation_cost                                        ║
-║  • activity_cost                                             ║
-║  • food_cost                                                 ║
-║                                                              ║
-╚══════════════════════════════════════════════════════════════╝
-        """
-        return error_message
-        
     except Exception as e:
         error_message = f"""
 ╔══════════════════════════════════════════════════════════════╗
@@ -1531,7 +1178,6 @@ Please customize it based on your specific destination and preferences.
 ║                                                              ║
 ║  💡 Please try:                                              ║
 ║  • Checking your destination spelling                        ║
-║  • Verifying all required parameters are provided           ║
 ║  • Using a different destination                             ║
 ║  • Contacting our support team                               ║
 ║                                                              ║
